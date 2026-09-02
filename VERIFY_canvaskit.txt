@@ -1,0 +1,15 @@
+mode=canvaskit  first-frame=3.8402999999970198 s  (10 Mbps / 40 ms, cache off)
+files to first frame=9  raw=10.64 MB  gzip=4.12 MB
+   7.23 MB raw  2.90 MB gz  canvaskit/canvaskit.wasm
+   2.43 MB raw  0.72 MB gz  main.dart.js
+   0.88 MB raw  0.46 MB gz  assets/assets/fonts/Inter-Variable.ttf
+   0.09 MB raw  0.03 MB gz  canvaskit/canvaskit.js
+   0.01 MB raw  0.00 MB gz  flutter_bootstrap.js
+   0.01 MB raw  0.00 MB gz  assets/fonts/MaterialIcons-Regular.otf
+   0.00 MB raw  0.00 MB gz  assets/assets/fonts/Roboto-Stub.ttf
+   0.00 MB raw  0.00 MB gz  index.html
+404s: []
+blocked third-party requests: []
+page errors: []
+renderer surface: no-canvas
+RESULT: PASS

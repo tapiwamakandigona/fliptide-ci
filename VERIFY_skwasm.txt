@@ -1,0 +1,15 @@
+mode=skwasm  first-frame=3.23439999999851 s  (10 Mbps / 40 ms, cache off)
+files to first frame=8  raw=5.74 MB  gzip=2.32 MB
+   3.58 MB raw  1.54 MB gz  canvaskit/skwasm.wasm
+   2.04 MB raw  0.75 MB gz  main.dart.wasm
+   0.06 MB raw  0.02 MB gz  canvaskit/skwasm.js
+   0.03 MB raw  0.01 MB gz  main.dart.mjs
+   0.01 MB raw  0.00 MB gz  flutter_bootstrap.js
+   0.00 MB raw  0.00 MB gz  assets/assets/fonts/Roboto-Stub.ttf
+   0.00 MB raw  0.00 MB gz  index.html
+   0.00 MB raw  0.00 MB gz  assets/FontManifest.json
+404s: []
+blocked third-party requests: []
+page errors: []
+renderer surface: no-canvas
+RESULT: PASS
