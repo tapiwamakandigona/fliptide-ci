@@ -157,7 +157,9 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
     // Rule 4: the supporter flag is checked before the SDK is even initialised.
     if (policy.mayLoad && _ads.supported) {
       await _ads.init();
-      _ads.loadInterstitial();
+      // Consent initialization can outlive this screen or a Supporter restore.
+      // Recheck at the load boundary; owned covers the async persistence window.
+      if (mounted && identical(_policy, policy) && policy.mayLoad && !_iap.owned.value) _ads.loadInterstitial();
     }
   }
 
