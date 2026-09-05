@@ -1,0 +1,36 @@
+name: fliptide
+description: "Fliptide — one-tap gravity-flip runner. Tsoro Studios."
+publish_to: 'none'
+version: 0.1.1+2
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flame: ^1.38.2
+  flutter:
+    sdk: flutter
+  google_mobile_ads: ^9.1.0
+  in_app_purchase: ^3.3.0
+  share_plus: ^13.3.0
+  shared_preferences: ^2.5.5
+  url_launcher: ^6.3.1
+  web: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Variable.ttf
+    # 2 KB stub registered as "Roboto" so the web engine does not download its
+    # default Roboto from fonts.gstatic.com. Every visible text style uses Inter.
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Stub.ttf
+
