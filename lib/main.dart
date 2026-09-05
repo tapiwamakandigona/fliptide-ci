@@ -764,27 +764,68 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 72,
-            fontWeight: FontWeight.w900,
-            color: accent,
-            height: 1,
-            letterSpacing: -2,
-            shadows: const [Shadow(color: Color(0xAA000000), blurRadius: 24)],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Palette.bg.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Palette.slabEdge.withValues(alpha: 0.5)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // A static gravity mark: geometry, not another downloaded asset.
+                // IgnorePointer remains at the parent; this never catches retry.
+                ExcludeSemantics(
+                  child: SizedBox(
+                    width: 64,
+                    height: 28,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Positioned(top: 0, left: 0, right: 0, child: Container(height: 2, color: Palette.slabEdge)),
+                        Positioned(bottom: 0, left: 0, right: 0, child: Container(height: 2, color: Palette.slabEdge)),
+                        Transform.rotate(
+                          angle: 0.7853981633974483,
+                          child: Container(width: 12, height: 12, color: accent),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 72,
+                      fontWeight: FontWeight.w900,
+                      color: accent,
+                      height: 1,
+                      letterSpacing: -2,
+                      shadows: const [Shadow(color: Color(0xAA000000), blurRadius: 24)],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  line,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Palette.textDim, height: 1.5),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          line,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Palette.textDim, height: 1.5),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -804,7 +845,12 @@ class _Btn extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+          // Preserve real label size at 300px: reduce only horizontal padding,
+          // never scale the whole row or move controls into the retry corridor.
+          padding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.sizeOf(context).width < 360 ? 16 : 22,
+            vertical: 14,
+          ),
           child: Text(
             label,
             style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5, color: primary ? Palette.bg : Palette.text),
