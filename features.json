@@ -1,0 +1,85 @@
+{
+  "$comment": "Machine-readable definition of done for PHASE 1 (Fliptide). Only flip passes to true with evidence (a command that ran, an artifact that exists, a URL that answered). Builder never edits verify commands or acceptance criteria — that's a spec change, report it in progress.md. Template: subagent-toolkit v3.0.1.",
+  "features": [
+    {
+      "id": "F1",
+      "title": "Deterministic sim + solver green",
+      "acceptance": "flutter test passes; a recorded input log replays to the identical death frame; every one of the 365 daily seeds for 2026 is solvable by the BFS solver.",
+      "verify": "flutter test",
+      "passes": true,
+      "evidence": "2026-09-02 07:5xZ `flutter test` → 66 passing in 5 s. Includes: replay of solver solution reproduces identical win frame (sim_test 'determinism'); per-chunk solvability; NEW 365-day sweep: every dailySeed of 2026 generates a solvable course, 0 flat fallbacks, 0 solver-forced chunk rerolls (printed by the test). 198a1d6 added test/death_overlay_test.dart (retry-tap pass-through, 150 ms guard, HUD == overlay percent, percentOf floor pins)."
+    },
+    {
+      "id": "F2",
+      "title": "Web build inside budget on the live Pages deploy",
+      "acceptance": "Per-player transfer <= 6 MB gz, both renderer paths (skwasm for Chromium >= 119; full CanvasKit + main.dart.js for Safari/Firefox/older Chrome): sum of gz transfer for all assets fetched to first playable frame on each path, and first playable frame <= 5.0 s with the network throttled to 10 Mbps, measured on the public Pages URL, numbers written in progress.md. Wording clarified by owner directive 02j-1 (2026-09-02) — clarification of the bar, not a loosening; the package zip size is not the criterion.",
+      "verify": "tool/measure_web.sh <pages-url>  (or Playwright HAR; command and output pasted in evidence)",
+      "passes": true,
+      "evidence": "Live Pages @d78dbc8, 10 Mbps/40 ms RTT, cache off (tool/webtest/measure_web.py, 2026-09-02 06:1xZ): 10 requests, 6.68 MB raw / est 2.85 MB gzip transfer, flutter-first-frame 2.85 s (wall 3.2 s). Bar: gz <=6 MB PASS, first frame <=5 s PASS. Note: raw uncompressed is 6.68 MB (skwasm 3.58 + main.dart.wasm 2.04 + Inter 0.88); the former fonts.gstatic.com Roboto fallback fetch is gone since 8508cdd (Roboto stub family in pubspec); live @198a1d6 and the CrazyGames nested-path check both request only the serving host (KP-4 closed). | 02j-1 (owner): bar is per-player transfer — trim branch numbers 2.32 MB gz (skwasm path) / 4.12 MB gz (canvaskit path), both < 4 s, PASS; evidence unchanged."
+    },
+    {
+      "id": "F3",
+      "title": "Restart under 300 ms",
+      "acceptance": "Death -> new attempt accepting input in <= 300 ms on Android release build and on the web build; measured 10 times, median and max recorded.",
+      "verify": "in-game perf overlay or instrumented log; numbers pasted in evidence",
+      "passes": false,
+      "evidence": "Web (local wasm build, Playwright hammering Space every 20 ms after death): n=9 restart samples 164 166 150 150 167 183 165 200 150 ms → median 165, max 200 (measured with the then-120 ms death-tap guard; guard is 150 ms since 198a1d6 per 02h — worst case ≈230 ms, still under 300). Android release build NOT measured — no device/emulator in the sandbox; needs an owner-side run of the CI APK with ?perf overlay equivalent (debug log)."
+    },
+    {
+      "id": "F4",
+      "title": "Text share first, PNG second",
+      "acceptance": "share_text() returns <= 300 chars, contains 'Fliptide', the course code, death %, attempt count and the Pages/Play link; identical string on web (clipboard) and Android (share sheet); PNG card still available as the second button.",
+      "verify": "flutter test test/share_text_test.dart",
+      "passes": true,
+      "evidence": "2026-09-02 `flutter test test/share_text_test.dart` green (≤300 chars, 'Fliptide', code, %/attempt, link; 4 cases). Live clipboard read via Playwright on Pages: 'Fliptide Daily #245 / 🟩×16 / CLEARED in 1 try / code 5P6-6GR / tapiwamakandigona.github.io/fliptide-ci' (106 chars). Android share sheet = share_plus, same string; PNG CARD button second."
+    },
+    {
+      "id": "F5",
+      "title": "Course codes",
+      "acceptance": "6-char Crockford base32 code encodes seed + generator version; entering a code on the title screen plays that exact course; today's Daily is a code; the same code produces the same course on web and Android (test asserts chunk sequence equality); adding a chunk to the library does not change any previously issued code's course.",
+      "verify": "flutter test test/course_code_test.dart",
+      "passes": true,
+      "evidence": "2026-09-02 `flutter test test/course_code_test.dart` green: 2000-code round trip, O/I/L/U tolerance, version+seed packing, frozen v1 pool (23 names) + golden code 400C1S with pinned chunk sequence, unknown version rejected. Web ?code=ABC123 deep link + CODE dialog verified in browser. Web↔Android equality is by construction (pure Dart, same test) — not separately run on a device."
+    },
+    {
+      "id": "F6",
+      "title": "Three-second readability",
+      "acceptance": "Phone-portrait and desktop-landscape screenshots at 300 px wide show floor, ceiling and player distinguishably; a first-time player is told 'tap to flip' before the first hazard; no text smaller than 12 px at 360x640.",
+      "verify": "screenshots in docs/screens/ inspected and named in evidence",
+      "passes": true,
+      "evidence": "docs/screens/: phone-portrait-air-300w.png + desktop-cleared-live-300w.png (300 px wide) show floor/ceiling/player distinctly; small-360x640-run.png + small-360x640-death.png at exactly 360x640 — HUD 13 px, mini buttons 12 px, no player-facing text < 12 px (the 11→12 bump is in lib/main.dart). Start card: 'tap to start · tap to flip gravity' shown over a 10-tile flat start pad before the first hazard."
+    },
+    {
+      "id": "F7",
+      "title": "Pages build plays end to end",
+      "acceptance": "On the public Pages URL, a run can be completed to the finish (solver-driven ?auto=1 run and a human run), the death and win overlays both render, and progress.md contains the words 'the Pages build plays end to end'.",
+      "verify": "Playwright script in tool/ against the live URL; run id + screenshots in evidence",
+      "passes": false,
+      "evidence": "2026-09-02 06:42Z Playwright on the live URL with ?auto=1: solver flips → CLEARED overlay (docs/screens/desktop-cleared-live.png); death overlay verified in the earlier live run (shots harness). progress.md contains 'the Pages build plays end to end'. HUMAN run still pending — owner-side Discord playtest. Lead desktop playthrough (02h, 390×844): first frame 1.7 s, first-party host only, 0 errors; two defects found and fixed in 198a1d6. Owner runs CI APK on phone; both closures are owner-side, builder does not self-approve."
+    },
+    {
+      "id": "F8",
+      "title": "Renamed to Fliptide everywhere public",
+      "acceptance": "applicationId com.tsorostudios.fliptide; pubspec name/description, web/index.html title + manifest, share text, Pages title and README say Fliptide; sync script points at fliptide-ci; no public surface says 'FLIP'.",
+      "verify": "grep -rn 'FLIP\\b' --include='*.dart' --include='*.html' --include='*.json' --include='*.yaml' --include='*.md' . | grep -v progress.md | grep -v DEMAND.md  (must be empty)",
+      "passes": true,
+      "evidence": "2026-09-02 grep -rn 'FLIP\\b' over dart/html/json/yaml/md excluding progress/DEMAND → only PROJECT.md:1,27 and features.json F8 acceptance (lead's own text). applicationId com.tsorostudios.fliptide; pubspec fliptide; index.html/manifest Fliptide; share text/card Fliptide; CI base href /fliptide-ci/; MIRROR_URL fliptide-ci; README Fliptide."
+    },
+    {
+      "id": "F9",
+      "title": "Signed Android debug-free release build from CI",
+      "acceptance": "fliptide-ci Actions produce APK + AAB signed with the pinned upload cert (SHA-256 39cdb292e19291fa044c8bd39396369dfa7cc43cbef07ee7fd3f15880b833a43); apksigner verify output in evidence. No GitHub Release yet — that needs an owner 'cut'.",
+      "verify": "apksigner verify --print-certs app-release.apk | grep -i sha-256",
+      "passes": true,
+      "evidence": "fliptide-ci run 33596017465 (post-rename, applicationId com.tsorostudios.fliptide) job 100139659686: 'V2 Signer: certificate SHA-256 digest: 39cdb292e19291fa044c8bd39396369dfa7cc43cbef07ee7fd3f15880b833a43' == pinned key; 'Signature OK'; APK + AAB artifacts (fliptide-release-apk / -aab) uploaded, 30-day retention. No GitHub Release cut (owner 'cut' required)."
+    },
+    {
+      "id": "F10",
+      "title": "CrazyGames Basic Launch submission package ready",
+      "acceptance": "Web zip built from the Pages build meets CrazyGames requirements (single-page, <50 MB, no external calls except fonts, works in incognito and with adblock); a 512x512 and 16:9 cover image (original art); a 2-3 sentence description in the owner's voice; all in docs/crazygames/. Submission itself is the owner side's action.",
+      "verify": "ls docs/crazygames/ && unzip -l docs/crazygames/fliptide-web.zip | tail -1",
+      "passes": true,
+      "evidence": "docs/crazygames/: fliptide-web.zip (rebuilt from 198a1d6 after CI green, 44 files, 35.8 MB unzipped, 14.1 MB zip, sha256 a0b99dd254ba24f8a284d497e928f5a3ded5502e37f18b0eb77f9962a49fe8e7; relative base href; renderer self-hosted via custom web/flutter_bootstrap.js canvasKitBaseUrl; no SW; .symbols stripped), cover-1920x1080.png, cover-1280x720.png, icon-512.png (code-drawn original art), description.md (owner's voice), README.md. Verified: nested-path load with all non-first-party hosts blocked → runs, state 'dead:1:7' reached, 0 page errors, only fonts.gstatic.com requested (falls back to bundled Inter). Rebuild: scripts/build_crazygames.sh."
+    }
+  ]
+}
