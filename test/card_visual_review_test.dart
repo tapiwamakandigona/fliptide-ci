@@ -75,7 +75,7 @@ void main() {
       ));
       await tester.pump();
       await tester.pump();
-      final wordmark = find.text('FLIPTIDE');
+      final wordmark = find.text('Fliptide');
       final text = tester.widget<Text>(wordmark);
       expect(text.maxLines, 1, reason: 'wordmark/result must never wrap on a narrow phone');
       final paragraph = tester.renderObject<RenderParagraph>(wordmark);
