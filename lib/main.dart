@@ -357,34 +357,46 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
   }
 
   Future<void> _enterCode() async {
+    final game = _game;
+    if (game == null) return;
+    final wasPaused = game.paused;
+    var switchedCourse = false;
+    // A modal takes the controls away: preserve the attempt until it closes.
+    game.pauseEngine();
     final ctrl = TextEditingController();
-    final code = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Palette.slab,
-        title: const Text('Play a course code', style: TextStyle(fontWeight: FontWeight.w900)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          textCapitalization: TextCapitalization.characters,
-          maxLength: 7,
-          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 4),
-          decoration: const InputDecoration(hintText: 'ABC-123', counterText: ''),
-          onSubmitted: (v) => Navigator.pop(ctx, v),
+    try {
+      final code = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Palette.slab,
+          title: const Text('Play a course code', style: TextStyle(fontWeight: FontWeight.w900)),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            maxLength: 7,
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 4),
+            decoration: const InputDecoration(hintText: 'ABC-123', counterText: ''),
+            onSubmitted: (v) => Navigator.pop(ctx, v),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text), child: const Text('PLAY')),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, ctrl.text), child: const Text('PLAY')),
-        ],
-      ),
-    );
-    if (code == null || !mounted) return;
-    final seed = codeToSeed(code);
-    if (seed == null) {
-      _showToast('That code is not valid');
-      return;
+      );
+      if (code == null || !mounted) return;
+      final seed = codeToSeed(code);
+      if (seed == null) {
+        _showToast('That code is not valid');
+        return;
+      }
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => PlayScreen(seed: seed)));
+      switchedCourse = true;
+    } finally {
+      // Undo only this dialog's pause, never revive a replaced/disposed game.
+      if (mounted && identical(_game, game) && !wasPaused && !switchedCourse) game.resumeEngine();
     }
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => PlayScreen(seed: seed)));
   }
 
   void _goDaily() => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const PlayScreen()));
