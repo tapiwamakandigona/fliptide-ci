@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flame/game.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'ads/ad_policy.dart';
 import 'ads/ads_service.dart';
@@ -22,6 +23,7 @@ import 'ui/share_sink.dart';
 import 'ui/share_text.dart';
 import 'ui/debug_bridge.dart';
 import 'ui/more_games.dart';
+import 'ui/language.dart';
 import 'ui/title_screen.dart';
 import 'ui/widgets.dart';
 
@@ -30,8 +32,19 @@ void main() {
   runApp(const FlipApp());
 }
 
-class FlipApp extends StatelessWidget {
+class FlipApp extends StatefulWidget {
   const FlipApp({super.key});
+
+  @override
+  State<FlipApp> createState() => _FlipAppState();
+}
+
+class _FlipAppState extends State<FlipApp> {
+  @override
+  void initState() {
+    super.initState();
+    unawaited(FlipLanguage.load());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,24 +54,44 @@ class FlipApp extends StatelessWidget {
     final seed = q['code'] == null ? null : codeToSeed(q['code']!);
     final auto = q['auto'] == '1';
     final perf = q['perf'] == '1';
-    return MaterialApp(
-      title: kGameName,
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: Palette.bg,
-        colorScheme: const ColorScheme.dark(primary: Palette.player, surface: Palette.bg),
-        fontFamily: 'Inter',
+    final level = q['level'] == null ? null : levelById(q['level']!);
+    return ValueListenableBuilder<String>(
+      valueListenable: FlipLanguage.choice,
+      builder: (_, choice, _) => MaterialApp(
+        title: kGameName,
+        debugShowCheckedModeBanner: false,
+        supportedLocales: flipLocales,
+        locale: FlipLanguage.locale(choice),
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        theme: ThemeData(
+          brightness: Brightness.dark,
+          scaffoldBackgroundColor: Palette.bg,
+          colorScheme: const ColorScheme.dark(
+            primary: Palette.player,
+            surface: Palette.bg,
+          ),
+          fontFamily: 'Inter',
+        ),
+        // A shared link opens its course directly; everything else starts at the title.
+        home: seed != null || level != null || auto || perf
+            ? PlayScreen(seed: seed, level: level, autoplay: auto, perf: perf)
+            : const TitleScreen(),
       ),
-      // A shared link opens its course directly; everything else starts at the title.
-      home: seed != null || auto || perf ? PlayScreen(seed: seed, autoplay: auto, perf: perf) : const TitleScreen(),
     );
   }
 }
 
 /// One course: the Daily (seed == null) or a shared code. Generate, play, log, share.
 class PlayScreen extends StatefulWidget {
-  const PlayScreen({super.key, this.seed, this.level, this.autoplay = false, this.perf = false, this.adsService, this.iapService});
+  const PlayScreen({
+    super.key,
+    this.seed,
+    this.level,
+    this.autoplay = false,
+    this.perf = false,
+    this.adsService,
+    this.iapService,
+  });
 
   /// null → today's Daily (unless [level] is set).
   final int? seed;
@@ -80,7 +113,9 @@ class PlayScreen extends StatefulWidget {
   State<PlayScreen> createState() => _PlayScreenState();
 }
 
-class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver implements FlipListener {
+class _PlayScreenState extends State<PlayScreen>
+    with WidgetsBindingObserver
+    implements FlipListener {
   Store? _store;
   DailyRecord? _rec;
   int _recKey = 0;
@@ -135,7 +170,10 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) _wasPaused = true;
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _wasPaused = true;
+    }
     if (state == AppLifecycleState.resumed && _wasPaused) {
       _wasPaused = false;
       _sessionBreak(SessionBreak.resumedFromBackground);
@@ -148,16 +186,22 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
     final spec = _isCampaign
         ? widget.level!.spec
         : widget.seed == null
-            ? GenSpec(seed: dailySeed(now))
-            : GenSpec.fromCode(widget.seed!);
-    final gen = generate(spec);
+        ? GenSpec(seed: dailySeed(now))
+        : GenSpec.fromCode(widget.seed!);
+    final gen = widget.level?.buildCourse() ?? generate(spec);
     // Records are keyed per course so a code course keeps its own best/ghost.
     // Campaign courses use a key derived from the level id so they never
     // collide with a Daily or a shared code.
-    final recKey = _isCampaign ? -(1 << 31) - kCampaign.indexOf(widget.level!) : (_isDaily ? dailyNumber(now) : -spec.packedCode);
+    final recKey = _isCampaign
+        ? widget.level!.recordKey
+        : (_isDaily ? dailyNumber(now) : -spec.packedCode);
     final rec = store.daily(recKey);
     final installMs = await store.installMs();
-    final policy = AdPolicy(supporter: store.supporter, appStartMs: _appStartMs, installMs: installMs);
+    final policy = AdPolicy(
+      supporter: store.supporter,
+      appStartMs: _appStartMs,
+      installMs: installMs,
+    );
     _supporter.value = store.supporter;
     setState(() {
       _store = store;
@@ -168,7 +212,12 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
       _gen = gen;
       _rec = rec;
       _attempts.value = 0; // 0 = not started yet → start card
-      _game = FlipGame(course: gen.course, listener: this, ghost: rec.ghost, autoFlips: widget.autoplay ? gen.solution.flips : const [])..attempts = rec.attempts;
+      _game = FlipGame(
+        course: gen.course,
+        listener: this,
+        ghost: rec.ghost,
+        autoFlips: widget.autoplay ? gen.solution.flips : const [],
+      )..attempts = rec.attempts;
     });
     // Store first: startup restore may flip the supporter flag (02O-1). Not awaited
     // so the title screen never waits on Play.
@@ -178,7 +227,12 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
       await _ads.init();
       // Consent initialization can outlive this screen or a Supporter restore.
       // Recheck at the load boundary; owned covers the async persistence window.
-      if (mounted && identical(_policy, policy) && policy.mayLoad && !_iap.owned.value) _ads.loadInterstitial();
+      if (mounted &&
+          identical(_policy, policy) &&
+          policy.mayLoad &&
+          !_iap.owned.value) {
+        _ads.loadInterstitial();
+      }
     }
   }
 
@@ -237,7 +291,8 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
 
   // ---- ads -------------------------------------------------------------
 
-  bool get _inAttempt => _phase.value == RunState.running && _attempts.value > 0;
+  bool get _inAttempt =>
+      _phase.value == RunState.running && _attempts.value > 0;
 
   void _refreshSecondChance() {
     final game = _game;
@@ -248,7 +303,12 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
     }
     _secondChance.value =
         _phase.value == RunState.dead &&
-        policy.canOfferSecondChance(attempt: _attempts.value, checkpointPassed: game.checkpoints.hasCheckpoint, usedToday: _store!.secondChanceUsed(_recKey), adReady: _ads.rewardedReady.value);
+        policy.canOfferSecondChance(
+          attempt: _attempts.value,
+          checkpointPassed: game.checkpoints.hasCheckpoint,
+          usedToday: _store!.secondChanceUsed(_recKey),
+          adReady: _ads.rewardedReady.value,
+        );
   }
 
   /// Preload the rewarded unit from the second death on, so it is ready when
@@ -256,7 +316,10 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
   void _maybePreloadRewarded(int attempts) {
     final policy = _policy;
     if (policy == null || !policy.mayLoad || !_ads.supported) return;
-    if (attempts < kSecondChanceMinAttempt - 1 || _store!.secondChanceUsed(_recKey)) return;
+    if (attempts < kSecondChanceMinAttempt - 1 ||
+        _store!.secondChanceUsed(_recKey)) {
+      return;
+    }
     _ads.loadRewarded();
   }
 
@@ -278,7 +341,9 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
       if (earned) {
         await _store!.setSecondChanceUsed(_recKey);
         final pct = (game.checkpoints.frac * 100).round();
-        if (game.resumeFromCheckpoint()) _showToast('Second chance · from $pct%');
+        if (game.resumeFromCheckpoint()) {
+          _showToast('Second chance · from $pct%');
+        }
       } else {
         _showToast('No second chance — ad not finished');
       }
@@ -292,7 +357,14 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
     final policy = _policy;
     if (policy == null || _game == null) return;
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (!policy.canShowInterstitial(kind: kind, nowMs: now, inAttempt: _inAttempt, adReady: _ads.interstitialReady.value)) return;
+    if (!policy.canShowInterstitial(
+      kind: kind,
+      nowMs: now,
+      inAttempt: _inAttempt,
+      adReady: _ads.interstitialReady.value,
+    )) {
+      return;
+    }
     policy.markInterstitialShown(now);
     await _ads.showInterstitial();
     if (policy.mayLoad) _ads.loadInterstitial();
@@ -322,13 +394,16 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
     _deathXs.add(progress * _gen!.course.length);
     if (progress > rec.best && !rec.won) {
       rec.best = progress;
-      rec.ghost = List.of(_game!.sim.flips); // best dying run = ghost until cleared
+      rec.ghost = List.of(
+        _game!.sim.flips,
+      ); // best dying run = ghost until cleared
     }
     _store!.save(rec);
     if (_dailyNo != null) _store!.touchDay(_dailyNo!);
     _store!.addDeath();
     _attempts.value = attempts;
-    _progress.value = progress; // HUD bar/percent = the death frame, same as the overlay
+    _progress.value =
+        progress; // HUD bar/percent = the death frame, same as the overlay
     _lastPct.value = percentOf(progress);
     _phase.value = RunState.dead;
     publishState('dead:$attempts:${_lastPct.value}');
@@ -347,7 +422,11 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
     if (_isCampaign) {
       _earnedStars = starsFor(_sessionAttempts);
       _store!.clearLevel(widget.level!.id, _earnedStars);
-      if (mounted) setState(() {}); // the CLEARED card reads the stars from the widget tree
+      if (mounted) {
+        setState(
+          () {},
+        ); // the CLEARED card reads the stars from the widget tree
+      }
     }
     if (_dailyNo != null) _store!.touchDay(_dailyNo!);
     _attempts.value = attempts;
@@ -369,7 +448,21 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
     setState(() => _busy = true);
     try {
       final rec = _rec!;
-      final text = shareText(course: _gen!.course, dailyNumber: _dailyNo, progress: rec.won ? 1 : (_lastPct.value / 100), attempts: rec.attempts, won: rec.won, streak: _store!.streak);
+      final text = _isCampaign
+          ? campaignShareText(
+              level: widget.level!,
+              attempts: _sessionAttempts,
+              won: rec.won,
+              progress: rec.won ? 1 : _lastPct.value / 100,
+            )
+          : shareText(
+              course: _gen!.course,
+              dailyNumber: _dailyNo,
+              progress: rec.won ? 1 : (_lastPct.value / 100),
+              attempts: rec.attempts,
+              won: rec.won,
+              streak: _store!.streak,
+            );
       _showToast(await shareTextOut(text));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -390,9 +483,17 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
           won: rec.won,
           streak: _store!.streak,
           deathXs: _deathXs,
+          campaignLabel: widget.level?.label,
+          campaignName: widget.level?.name,
+          campaignUrl: _isCampaign
+              ? '$kShareUrl/?level=${widget.level!.id}'
+              : null,
         ),
       );
-      await saveImage(png, 'fliptide-${_isDaily ? "daily-$_dailyNo" : "course-$_code"}.png');
+      await saveImage(
+        png,
+        'fliptide-${_isDaily ? "daily-$_dailyNo" : "course-$_code"}.png',
+      );
       _showToast('Card saved');
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -414,11 +515,15 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
         _showToast('That code is not valid');
         return;
       }
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => PlayScreen(seed: seed)));
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => PlayScreen(seed: seed)),
+      );
       switchedCourse = true;
     } finally {
       // Undo only this dialog's pause, never revive a replaced/disposed game.
-      if (mounted && identical(_game, game) && !wasPaused && !switchedCourse) game.resumeEngine();
+      if (mounted && identical(_game, game) && !wasPaused && !switchedCourse) {
+        game.resumeEngine();
+      }
     }
   }
 
@@ -427,17 +532,23 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
     if (nav.canPop()) {
       nav.pop();
     } else {
-      nav.pushReplacement(MaterialPageRoute(builder: (_) => const TitleScreen()));
+      nav.pushReplacement(
+        MaterialPageRoute(builder: (_) => const TitleScreen()),
+      );
     }
   }
 
   void _goNext() {
     final next = nextLevel(widget.level!);
     if (next == null) return _goMenu();
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => PlayScreen(level: next)));
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => PlayScreen(level: next)),
+    );
   }
 
-  void _goDaily() => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const PlayScreen()));
+  void _goDaily() => Navigator.of(
+    context,
+  ).pushReplacement(MaterialPageRoute(builder: (_) => const PlayScreen()));
 
   void _showToast(String msg) {
     setState(() => _toast = msg);
@@ -460,9 +571,19 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
         children: [
           GameWidget(game: game, autofocus: true),
           _Hud(
-            label: _isCampaign ? widget.level!.label : (_dailyNo != null ? 'DAILY #$_dailyNo' : 'COURSE ${prettyCode(_code)}'),
+            label: _isCampaign
+                ? '${ft(context, 'TIDE {number}', args: {'number': widget.level!.tide})} · ${widget.level!.index}'
+                : (_dailyNo != null
+                      ? ft(
+                          context,
+                          'DAILY #{number}',
+                          args: {'number': _dailyNo!},
+                        )
+                      : 'COURSE ${prettyCode(_code)}'),
             code: prettyCode(_code),
             levelName: _isCampaign ? widget.level!.name : null,
+            levelHint: widget.level?.hint,
+            levelStory: widget.level?.story,
             stars: _earnedStars,
             onMenu: _goMenu,
             onNext: _isCampaign ? _goNext : null,
@@ -498,20 +619,35 @@ class _PlayScreenState extends State<PlayScreen> with WidgetsBindingObserver imp
                 builder: (_, _, _) => Text(
                   'restart ms: ${game.restartMs.join(" ")}',
                   key: const Key('perf-restart'),
-                  style: const TextStyle(fontSize: 12, color: Palette.textDim, fontFeatures: [FontFeature.tabularFigures()]),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Palette.textDim,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
                 ),
               ),
             ),
           if (_toast != null)
             Positioned(
-              bottom: MediaQuery.sizeOf(context).height * 0.20 + 8, // above the button band
+              bottom:
+                  MediaQuery.sizeOf(context).height * 0.20 +
+                  8, // above the button band
               left: 0,
               right: 0,
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(color: Palette.slab, borderRadius: BorderRadius.circular(12)),
-                  child: Text(_toast!, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Palette.slab,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _toast!,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ),
@@ -550,6 +686,8 @@ class _Hud extends StatelessWidget {
     this.onNext,
     this.hasNext = false,
     this.levelName,
+    this.levelHint,
+    this.levelStory,
     this.stars = 0,
   });
 
@@ -577,6 +715,7 @@ class _Hud extends StatelessWidget {
   final VoidCallback onSupport;
   final VoidCallback onRestore;
   final int Function() checkpointPct;
+
   /// Cross-promo footer on the start card (title-like surface only, 05b).
   final bool showPromo;
   final bool busy;
@@ -586,9 +725,15 @@ class _Hud extends StatelessWidget {
   final VoidCallback? onNext;
   final bool hasNext;
   final String? levelName;
+  final String? levelHint;
+  final String? levelStory;
   final int stars;
 
-  static const _dim = TextStyle(color: Palette.textDim, fontWeight: FontWeight.w700, fontSize: 13);
+  static const _dim = TextStyle(
+    color: Palette.textDim,
+    fontWeight: FontWeight.w700,
+    fontSize: 13,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -605,7 +750,18 @@ class _Hud extends StatelessWidget {
                 // before the bar collapses; short campaign labels take only what they need.
                 Flexible(
                   flex: 3,
-                  child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, softWrap: false, style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5, color: Palette.textDim, fontSize: 13)),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.5,
+                      color: Palette.textDim,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -617,14 +773,27 @@ class _Hud extends StatelessWidget {
                       child: Stack(
                         children: [
                           Container(height: 10, color: Palette.corridor),
-                          FractionallySizedBox(widthFactor: best.clamp(0, 1), child: Container(height: 10, color: Palette.slabEdge)),
+                          FractionallySizedBox(
+                            widthFactor: best.clamp(0, 1),
+                            child: Container(
+                              height: 10,
+                              color: Palette.slabEdge,
+                            ),
+                          ),
                           // The fill eases towards the sim value so restarts snap back and progress glides.
                           AnimatedFractionallySizedBox(
                             duration: Duration(milliseconds: p == 0 ? 0 : 120),
                             curve: Curves.easeOut,
                             alignment: Alignment.centerLeft,
                             widthFactor: p.clamp(0, 1),
-                            child: Container(height: 10, decoration: const BoxDecoration(gradient: LinearGradient(colors: [Palette.playerDark, Palette.player]))),
+                            child: Container(
+                              height: 10,
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Palette.playerDark, Palette.player],
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -635,14 +804,19 @@ class _Hud extends StatelessWidget {
                 ValueListenableBuilder<double>(
                   valueListenable: progress,
                   builder: (_, p, _) => SizedBox(
-                    width: 64, // fits "100%" at w900/18 px — 52 wrapped it onto two lines on CLEARED
+                    width:
+                        64, // fits "100%" at w900/18 px — 52 wrapped it onto two lines on CLEARED
                     child: Text(
                       '${percentOf(p)}%',
                       key: const Key('hud-pct'),
                       maxLines: 1,
                       softWrap: false,
                       textAlign: TextAlign.right,
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, fontFeatures: [FontFeature.tabularFigures()]),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
                 ),
@@ -658,14 +832,23 @@ class _Hud extends StatelessWidget {
                 Flexible(
                   child: ValueListenableBuilder<int>(
                     valueListenable: attempts,
-                    builder: (_, a, _) => Text('attempt $a', style: _dim, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    builder: (_, a, _) => Text(
+                      ft(context, 'attempt {number}', args: {'number': a}),
+                      style: _dim,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
                 const Spacer(),
                 Text('~${seconds.round()}s', style: _dim),
                 const SizedBox(width: 12),
-                if (onEnterCode != null) _MiniBtn(label: 'CODE', onTap: onEnterCode!),
-                if (onDaily != null) ...[const SizedBox(width: 6), _MiniBtn(label: 'DAILY', onTap: onDaily!)],
+                if (onEnterCode != null)
+                  _MiniBtn(label: ft(context, 'CODE'), onTap: onEnterCode!),
+                if (onDaily != null) ...[
+                  const SizedBox(width: 6),
+                  _MiniBtn(label: ft(context, 'DAILY'), onTap: onDaily!),
+                ],
               ],
             ),
           ),
@@ -682,16 +865,38 @@ class _Hud extends StatelessWidget {
                         valueListenable: attempts,
                         builder: (_, a, _) => a == 0
                             ? (levelName != null
-                                ? _Card(title: levelName!, line: 'tap to start · tap to flip gravity', accent: Palette.player, titleSize: 44)
-                                : _Card(title: kGameName, line: 'tap to start · tap to flip gravity\ncode $code', accent: Palette.player))
+                                  ? _Card(
+                                      title: ft(context, levelName!),
+                                      line: ft(
+                                        context,
+                                        levelHint ??
+                                            'tap to start · tap to flip gravity',
+                                      ),
+                                      accent: Palette.player,
+                                      titleSize: 44,
+                                    )
+                                  : _Card(
+                                      title: kGameName,
+                                      line:
+                                          '${ft(context, 'tap to start · tap to flip gravity')}\n${ft(context, 'CODE')} $code',
+                                      accent: Palette.player,
+                                    ))
                             : const SizedBox.shrink(),
                       );
                     }
                     final won = ph == RunState.won;
                     final card = _Card(
                       key: const Key('death-card'),
-                      title: won ? 'CLEARED' : '${lastPct.value}%',
-                      line: won ? (onNext != null ? 'attempt ${attempts.value}' : 'attempt ${attempts.value} · tell someone') : 'tap anywhere to retry',
+                      title: won ? ft(context, 'CLEARED') : '${lastPct.value}%',
+                      line: won
+                          ? (onNext != null
+                                ? ft(
+                                    context,
+                                    'attempt {number}',
+                                    args: {'number': attempts.value},
+                                  )
+                                : '${ft(context, 'attempt {number}', args: {'number': attempts.value})} · ${ft(context, 'tell someone')}')
+                          : ft(context, 'tap anywhere to retry'),
                       accent: won ? Palette.finish : Palette.text,
                       stars: won && onNext != null ? stars : null,
                     );
@@ -702,7 +907,8 @@ class _Hud extends StatelessWidget {
                         tween: Tween(begin: 0, end: 1),
                         duration: const Duration(milliseconds: 300),
                         curve: const Interval(0.5, 1),
-                        builder: (_, o, child) => Opacity(opacity: o, child: child),
+                        builder: (_, o, child) =>
+                            Opacity(opacity: o, child: child),
                         child: card,
                       );
                     }
@@ -712,7 +918,13 @@ class _Hud extends StatelessWidget {
                       tween: Tween(begin: 0, end: 1),
                       duration: const Duration(milliseconds: 140),
                       curve: Curves.easeOutBack,
-                      builder: (_, k, child) => Opacity(opacity: k.clamp(0.0, 1.0), child: Transform.scale(scale: 0.86 + 0.14 * k, child: child)),
+                      builder: (_, k, child) => Opacity(
+                        opacity: k.clamp(0.0, 1.0),
+                        child: Transform.scale(
+                          scale: 0.86 + 0.14 * k,
+                          child: child,
+                        ),
+                      ),
                       child: card,
                     );
                   },
@@ -720,13 +932,14 @@ class _Hud extends StatelessWidget {
               ),
             ),
           ),
-          // Bottom fifth: the button row, below the corridor and out of the flip-tap zone
-          // (directive 02h-1b). Only the buttons themselves catch taps.
+          // Bottom fifth normally; larger translated controls get a taller
+          // band instead of tiny type. The corridor centre remains tap-through.
           LayoutBuilder(
             builder: (context, _) {
               final h = MediaQuery.sizeOf(context).height;
+              final largeText = MediaQuery.textScalerOf(context).scale(14) > 17;
               return SizedBox(
-                height: h * 0.20,
+                height: h * (largeText ? 0.34 : 0.20),
                 child: Center(
                   child: ValueListenableBuilder<RunState>(
                     valueListenable: phase,
@@ -738,31 +951,69 @@ class _Hud extends StatelessWidget {
                         // starts show the level name alone.
                         return ValueListenableBuilder<int>(
                           valueListenable: attempts,
-                          builder: (_, a, _) => a == 0 && showPromo
-                              ? Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _supportRow(),
-                                    const SizedBox(height: 8),
-                                    const MoreFromTsoro(compact: true),
-                                  ],
-                                )
+                          builder: (_, a, _) => a == 0
+                              ? !showPromo
+                                    ? Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 24,
+                                        ),
+                                        child: Text(
+                                          ft(
+                                            context,
+                                            levelStory ?? 'Follow the current.',
+                                          ),
+                                          key: const Key('campaign-story'),
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            height: 1.4,
+                                            color: Palette.textDim,
+                                          ),
+                                        ),
+                                      )
+                                    : Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _supportRow(),
+                                          const SizedBox(height: 8),
+                                          const MoreFromTsoro(compact: true),
+                                        ],
+                                      )
                               : const SizedBox.shrink(),
                         );
                       }
                       final won = ph == RunState.won;
                       final row = _Rise(
-                        key: ValueKey('rise-${attempts.value}-${won ? 'w' : 'd'}'),
-                        delay: won ? const Duration(milliseconds: 150) : Duration.zero,
-                        child: Row(
+                        key: ValueKey(
+                          'rise-${attempts.value}-${won ? 'w' : 'd'}',
+                        ),
+                        delay: won
+                            ? const Duration(milliseconds: 150)
+                            : Duration.zero,
+                        child: Wrap(
                           key: const Key('death-buttons'),
-                          mainAxisSize: MainAxisSize.min,
+                          alignment: WrapAlignment.center,
+                          spacing: 10,
+                          runSpacing: 8,
                           children: [
-                            if (!won) _Btn(label: 'RETRY', onTap: onRetry, primary: true),
-                            if (won && onNext != null) _Btn(key: const Key('next-level'), label: hasNext ? 'NEXT' : 'THE TIDES', onTap: onNext!, primary: true),
-                            const SizedBox(width: 10),
-                            _Btn(label: busy ? '…' : 'SHARE', onTap: onShareText, primary: won && onNext == null),
-                            const SizedBox(width: 10),
+                            if (!won)
+                              _Btn(
+                                label: 'RETRY',
+                                onTap: onRetry,
+                                primary: true,
+                              ),
+                            if (won && onNext != null)
+                              _Btn(
+                                key: const Key('next-level'),
+                                label: hasNext ? 'NEXT' : 'THE TIDES',
+                                onTap: onNext!,
+                                primary: true,
+                              ),
+                            _Btn(
+                              label: busy ? '…' : 'SHARE',
+                              onTap: onShareText,
+                              primary: won && onNext == null,
+                            ),
                             _Btn(label: 'CARD', onTap: onShareCard),
                           ],
                         ),
@@ -780,7 +1031,12 @@ class _Hud extends StatelessWidget {
                                     ? const SizedBox.shrink()
                                     : ValueListenableBuilder<String?>(
                                         valueListenable: price,
-                                        builder: (_, pr, _) => _MiniBtn(key: const Key('support-cleared'), label: 'REMOVE ADS · ${pr ?? kSupporterFallbackPrice}', onTap: onSupport),
+                                        builder: (_, pr, _) => _MiniBtn(
+                                          key: const Key('support-cleared'),
+                                          label:
+                                              'REMOVE ADS · ${pr ?? kSupporterFallbackPrice}',
+                                          onTap: onSupport,
+                                        ),
                                       ),
                               ),
                             ],
@@ -795,12 +1051,20 @@ class _Hud extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (offer) ...[
-                              _Btn(key: const Key('second-chance'), label: 'SECOND CHANCE', onTap: onSecondChance),
+                              _Btn(
+                                key: const Key('second-chance'),
+                                label: 'SECOND CHANCE',
+                                onTap: onSecondChance,
+                              ),
                               const SizedBox(height: 4),
                               IgnorePointer(
                                 child: Text(
                                   'watch an ad · resume from ${checkpointPct()}%',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Palette.textDim),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: Palette.textDim,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -832,7 +1096,12 @@ extension on _Hud {
           return const Text(
             '♥ SUPPORTER · no ads',
             key: Key('supporter-mark'),
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Palette.finish),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: Palette.finish,
+            ),
           );
         }
         return Column(
@@ -840,7 +1109,13 @@ extension on _Hud {
           children: [
             ValueListenableBuilder<String?>(
               valueListenable: price,
-              builder: (_, pr, _) => _MiniBtn(key: const Key('support'), label: busy ? '…' : 'SUPPORT · ${pr ?? kSupporterFallbackPrice} · REMOVES ADS', onTap: onSupport),
+              builder: (_, pr, _) => _MiniBtn(
+                key: const Key('support'),
+                label: busy
+                    ? '…'
+                    : 'SUPPORT · ${pr ?? kSupporterFallbackPrice} · REMOVES ADS',
+                onTap: onSupport,
+              ),
             ),
             const SizedBox(height: 6),
             GestureDetector(
@@ -851,7 +1126,11 @@ extension on _Hud {
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: Text(
                   'Restore purchase',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Palette.textDim),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Palette.textDim,
+                  ),
                 ),
               ),
             ),
@@ -863,7 +1142,14 @@ extension on _Hud {
 }
 
 class _Card extends StatelessWidget {
-  const _Card({super.key, required this.title, required this.line, this.accent = Palette.text, this.titleSize = 72, this.stars});
+  const _Card({
+    super.key,
+    required this.title,
+    required this.line,
+    this.accent = Palette.text,
+    this.titleSize = 72,
+    this.stars,
+  });
   final String title;
   final String line;
   final Color accent;
@@ -882,15 +1168,41 @@ class _Card extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(title, maxLines: 1, softWrap: false, textAlign: TextAlign.center, style: TextStyle(fontSize: titleSize, fontWeight: FontWeight.w900, color: accent, height: 1, letterSpacing: -2, shadows: const [Shadow(color: Color(0xAA000000), blurRadius: 24)])),
+            child: Text(
+              title,
+              maxLines: 1,
+              softWrap: false,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: titleSize,
+                fontWeight: FontWeight.w900,
+                color: accent,
+                height: 1,
+                letterSpacing: -2,
+                shadows: const [
+                  Shadow(color: Color(0xAA000000), blurRadius: 24),
+                ],
+              ),
+            ),
           ),
         ),
-        if (stars != null) ...[const SizedBox(height: 8), StarRow(key: const Key('cleared-stars'), earned: stars!, size: 30)],
+        if (stars != null) ...[
+          const SizedBox(height: 8),
+          StarRow(key: const Key('cleared-stars'), earned: stars!, size: 30),
+        ],
         const SizedBox(height: 6),
-        Text(
-          line,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Palette.textDim, height: 1.5),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            line,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Palette.textDim,
+              height: 1.5,
+            ),
+          ),
         ),
       ],
     );
@@ -909,15 +1221,27 @@ class _Rise extends StatelessWidget {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: Duration(milliseconds: 180) + delay,
-      curve: Interval(delay.inMilliseconds / (180 + delay.inMilliseconds), 1, curve: Curves.easeOutCubic),
-      builder: (_, k, c) => Opacity(opacity: k, child: Transform.translate(offset: Offset(0, (1 - k) * 14), child: c)),
+      curve: Interval(
+        delay.inMilliseconds / (180 + delay.inMilliseconds),
+        1,
+        curve: Curves.easeOutCubic,
+      ),
+      builder: (_, k, c) => Opacity(
+        opacity: k,
+        child: Transform.translate(offset: Offset(0, (1 - k) * 14), child: c),
+      ),
       child: child,
     );
   }
 }
 
 class _Btn extends StatelessWidget {
-  const _Btn({super.key, required this.label, required this.onTap, this.primary = false});
+  const _Btn({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+  });
   final String label;
   final VoidCallback onTap;
   final bool primary;
@@ -928,20 +1252,34 @@ class _Btn extends StatelessWidget {
       color: primary ? Palette.player : Palette.slab,
       borderRadius: BorderRadius.circular(14),
       elevation: primary ? 6 : 0,
-      shadowColor: primary ? Palette.player.withValues(alpha: 0.45) : Colors.transparent,
+      shadowColor: primary
+          ? Palette.player.withValues(alpha: 0.45)
+          : Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: primary ? null : Border.all(color: Palette.slabEdge.withValues(alpha: 0.6), width: 1.5),
+            border: primary
+                ? null
+                : Border.all(
+                    color: Palette.slabEdge.withValues(alpha: 0.6),
+                    width: 1.5,
+                  ),
           ),
           // Narrow phones (< 360): trim horizontal padding only; label size stays (from PR #6).
-          padding: EdgeInsets.symmetric(horizontal: MediaQuery.sizeOf(context).width < 360 ? 16 : 22, vertical: 14),
+          padding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.sizeOf(context).width < 360 ? 16 : 22,
+            vertical: 14,
+          ),
           child: Text(
-            label,
-            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5, color: primary ? Palette.bg : Palette.text),
+            ft(context, label),
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+              color: primary ? Palette.bg : Palette.text,
+            ),
           ),
         ),
       ),
@@ -966,7 +1304,12 @@ class _MiniBtn extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           child: Text(
             label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Palette.textDim),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2,
+              color: Palette.textDim,
+            ),
           ),
         ),
       ),

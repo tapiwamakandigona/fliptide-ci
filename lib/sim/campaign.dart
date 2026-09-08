@@ -16,6 +16,10 @@
 library;
 
 import 'generator.dart';
+import 'chunks.dart';
+import 'course.dart';
+import 'shallows.dart';
+import 'solver.dart';
 
 class Tide {
   const Tide({required this.index, required this.name, required this.tagline, required this.levels});
@@ -28,13 +32,7 @@ class Tide {
 }
 
 class CampaignLevel {
-  const CampaignLevel({
-    required this.id,
-    required this.tide,
-    required this.index,
-    required this.name,
-    required this.spec,
-  });
+  const CampaignLevel({required this.id, required this.tide, required this.index, required this.name, required this.spec});
 
   /// Stable save key, e.g. `t2l4`. Never renumber a shipped id.
   final String id;
@@ -47,15 +45,35 @@ class CampaignLevel {
 
   /// HUD label: `TIDE 2 · 4`.
   String get label => 'TIDE $tide · $index';
+
+  bool get isAuthored => tide == 1 && index >= 1 && index <= shallows.length;
+  String? get hint => isAuthored ? shallowsHints[index - 1] : null;
+  String? get story => isAuthored ? shallowsStory[index - 1] : null;
+
+  /// Revision the *attempt replay*, not earned stars. Old ghosts used the
+  /// seeded geometry and must never run against the new authored course.
+  int get recordRevision => isAuthored ? 1 : 0;
+  int get recordKey => -(1 << 31) - kCampaign.indexOf(this) - recordRevision * 1000;
+
+  /// UI metadata, no generator or solver in widget build. The procedural
+  /// estimate deliberately says "~"; its body may overshoot by one chunk.
+  double get estimatedSeconds => isAuthored ? shallows[index - 1].fold<int>(0, (n, c) => n + c.width) / spec.speed : (spec.targetColumns + kStart.width + kFinish.width + 8) / spec.speed;
+
+  GeneratedCourse buildCourse() {
+    if (!isAuthored) return generate(spec);
+    final course = Course(seed: spec.packedCode, chunks: shallows[index - 1], speed: spec.speed);
+    final result = solve(course);
+    if (!result.solvable) throw StateError('Authored course $id is unsolvable');
+    return GeneratedCourse(course, result.solution!, 0);
+  }
 }
 
 GenSpec _spec(int seed, {required int columns, required double speed, required int maxTier, required Map<int, int> weights}) =>
     GenSpec(seed: seed, targetColumns: columns, speed: speed, maxTier: maxTier, tierWeights: weights);
 
 List<CampaignLevel> _tide(int t, List<String> names, List<GenSpec> specs) => [
-      for (var i = 0; i < names.length; i++)
-        CampaignLevel(id: 't${t}l${i + 1}', tide: t, index: i + 1, name: names[i], spec: specs[i]),
-    ];
+  for (var i = 0; i < names.length; i++) CampaignLevel(id: 't${t}l${i + 1}', tide: t, index: i + 1, name: names[i], spec: specs[i]),
+];
 
 const _w1 = {1: 1};
 const _w2 = {1: 3, 2: 2};
@@ -70,66 +88,86 @@ final List<Tide> kTides = [
     index: 1,
     name: 'Shallows',
     tagline: 'Learn the flip.',
-    levels: _tide(1, ['First Light', 'Low Water', 'Sandbar', 'Ripples', 'Rock Pool', 'Ebb'], [
-      _spec(1001, columns: 60, speed: 6.5, maxTier: 1, weights: _w1),
-      _spec(1002, columns: 70, speed: 6.5, maxTier: 1, weights: _w1),
-      _spec(1003, columns: 80, speed: 7.0, maxTier: 1, weights: _w1),
-      _spec(1004, columns: 90, speed: 7.0, maxTier: 1, weights: _w1),
-      _spec(1005, columns: 100, speed: 7.5, maxTier: 1, weights: _w1),
-      _spec(1006, columns: 110, speed: 7.5, maxTier: 2, weights: {1: 4, 2: 1}),
-    ]),
+    levels: _tide(
+      1,
+      ['First Light', 'Low Water', 'Sandbar', 'Ripples', 'Rock Pool', 'Ebb'],
+      [
+        _spec(1001, columns: 60, speed: 6.5, maxTier: 1, weights: _w1),
+        _spec(1002, columns: 70, speed: 6.5, maxTier: 1, weights: _w1),
+        _spec(1003, columns: 80, speed: 7.0, maxTier: 1, weights: _w1),
+        _spec(1004, columns: 90, speed: 7.0, maxTier: 1, weights: _w1),
+        _spec(1005, columns: 100, speed: 7.5, maxTier: 1, weights: _w1),
+        _spec(1006, columns: 110, speed: 7.5, maxTier: 2, weights: {1: 4, 2: 1}),
+      ],
+    ),
   ),
   Tide(
     index: 2,
     name: 'Drift',
     tagline: 'The current picks up.',
-    levels: _tide(2, ['Open Water', 'Kelp Line', 'Cross-Swell', 'Wreck', 'Shoal', 'Slack Tide'], [
-      _spec(2001, columns: 110, speed: 8.0, maxTier: 2, weights: _w2),
-      _spec(2002, columns: 120, speed: 8.0, maxTier: 2, weights: _w2),
-      _spec(2003, columns: 130, speed: 8.0, maxTier: 2, weights: _w2),
-      _spec(2004, columns: 140, speed: 8.5, maxTier: 2, weights: _w2),
-      _spec(2005, columns: 150, speed: 8.5, maxTier: 2, weights: {1: 2, 2: 3}),
-      _spec(2006, columns: 150, speed: 8.5, maxTier: 3, weights: {1: 2, 2: 3, 3: 1}),
-    ]),
+    levels: _tide(
+      2,
+      ['Open Water', 'Kelp Line', 'Cross-Swell', 'Wreck', 'Shoal', 'Slack Tide'],
+      [
+        _spec(2001, columns: 110, speed: 8.0, maxTier: 2, weights: _w2),
+        _spec(2002, columns: 120, speed: 8.0, maxTier: 2, weights: _w2),
+        _spec(2003, columns: 130, speed: 8.0, maxTier: 2, weights: _w2),
+        _spec(2004, columns: 140, speed: 8.5, maxTier: 2, weights: _w2),
+        _spec(2005, columns: 150, speed: 8.5, maxTier: 2, weights: {1: 2, 2: 3}),
+        _spec(2006, columns: 150, speed: 8.5, maxTier: 3, weights: {1: 2, 2: 3, 3: 1}),
+      ],
+    ),
   ),
   Tide(
     index: 3,
     name: 'Undertow',
     tagline: 'What pulls you under.',
-    levels: _tide(3, ['Blue Hole', 'Reef Teeth', 'Down-Draft', 'Cavern', 'Pressure', 'Surge'], [
-      _spec(3001, columns: 150, speed: 8.5, maxTier: 3, weights: _w3),
-      _spec(3002, columns: 160, speed: 9.0, maxTier: 3, weights: _w3),
-      _spec(3003, columns: 170, speed: 9.0, maxTier: 3, weights: _w3),
-      _spec(3004, columns: 180, speed: 9.0, maxTier: 3, weights: _w3),
-      _spec(3005, columns: 190, speed: 9.0, maxTier: 3, weights: {1: 1, 2: 3, 3: 3}),
-      _spec(3006, columns: 190, speed: 9.0, maxTier: 4, weights: {1: 1, 2: 3, 3: 3, 4: 1}),
-    ]),
+    levels: _tide(
+      3,
+      ['Blue Hole', 'Reef Teeth', 'Down-Draft', 'Cavern', 'Pressure', 'Surge'],
+      [
+        _spec(3001, columns: 150, speed: 8.5, maxTier: 3, weights: _w3),
+        _spec(3002, columns: 160, speed: 9.0, maxTier: 3, weights: _w3),
+        _spec(3003, columns: 170, speed: 9.0, maxTier: 3, weights: _w3),
+        _spec(3004, columns: 180, speed: 9.0, maxTier: 3, weights: _w3),
+        _spec(3005, columns: 190, speed: 9.0, maxTier: 3, weights: {1: 1, 2: 3, 3: 3}),
+        _spec(3006, columns: 190, speed: 9.0, maxTier: 4, weights: {1: 1, 2: 3, 3: 3, 4: 1}),
+      ],
+    ),
   ),
   Tide(
     index: 4,
     name: 'Riptide',
     tagline: 'No slack left.',
-    levels: _tide(4, ['Breakwater', 'Spindrift', 'Whitecaps', 'Gully', 'Tempest', 'Storm Wall'], [
-      _spec(4001, columns: 190, speed: 9.5, maxTier: 4, weights: _w4),
-      _spec(4002, columns: 200, speed: 9.5, maxTier: 4, weights: _w4),
-      _spec(4003, columns: 210, speed: 9.5, maxTier: 4, weights: _w4),
-      _spec(4004, columns: 220, speed: 9.5, maxTier: 4, weights: _w4),
-      _spec(4005, columns: 230, speed: 10.0, maxTier: 4, weights: _w4),
-      _spec(4006, columns: 230, speed: 10.0, maxTier: 4, weights: {2: 2, 3: 3, 4: 2}),
-    ]),
+    levels: _tide(
+      4,
+      ['Breakwater', 'Spindrift', 'Whitecaps', 'Gully', 'Tempest', 'Storm Wall'],
+      [
+        _spec(4001, columns: 190, speed: 9.5, maxTier: 4, weights: _w4),
+        _spec(4002, columns: 200, speed: 9.5, maxTier: 4, weights: _w4),
+        _spec(4003, columns: 210, speed: 9.5, maxTier: 4, weights: _w4),
+        _spec(4004, columns: 220, speed: 9.5, maxTier: 4, weights: _w4),
+        _spec(4005, columns: 230, speed: 10.0, maxTier: 4, weights: _w4),
+        _spec(4006, columns: 230, speed: 10.0, maxTier: 4, weights: {2: 2, 3: 3, 4: 2}),
+      ],
+    ),
   ),
   Tide(
     index: 5,
     name: 'Maelstrom',
     tagline: 'The last flip.',
-    levels: _tide(5, ['Vortex', 'Black Water', 'Crush Depth', 'The Drop', 'Eye of It', 'Fliptide'], [
-      _spec(5001, columns: 230, speed: 10.0, maxTier: 4, weights: _w5),
-      _spec(5002, columns: 240, speed: 10.0, maxTier: 4, weights: _w5),
-      _spec(5003, columns: 250, speed: 10.5, maxTier: 4, weights: _w5),
-      _spec(5004, columns: 260, speed: 10.5, maxTier: 4, weights: _w5),
-      _spec(5005, columns: 270, speed: 10.5, maxTier: 4, weights: _w5),
-      _spec(5006, columns: 280, speed: 11.0, maxTier: 4, weights: {3: 3, 4: 3}),
-    ]),
+    levels: _tide(
+      5,
+      ['Vortex', 'Black Water', 'Crush Depth', 'The Drop', 'Eye of It', 'Fliptide'],
+      [
+        _spec(5001, columns: 230, speed: 10.0, maxTier: 4, weights: _w5),
+        _spec(5002, columns: 240, speed: 10.0, maxTier: 4, weights: _w5),
+        _spec(5003, columns: 250, speed: 10.5, maxTier: 4, weights: _w5),
+        _spec(5004, columns: 260, speed: 10.5, maxTier: 4, weights: _w5),
+        _spec(5005, columns: 270, speed: 10.5, maxTier: 4, weights: _w5),
+        _spec(5006, columns: 280, speed: 11.0, maxTier: 4, weights: {3: 3, 4: 3}),
+      ],
+    ),
   ),
 ];
 

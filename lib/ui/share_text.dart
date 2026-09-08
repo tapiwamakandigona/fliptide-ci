@@ -5,19 +5,18 @@ library;
 import '../sim/physics.dart';
 import '../sim/course.dart';
 import '../sim/course_code.dart';
+import '../sim/campaign.dart';
 
 const String kGameName = 'Fliptide';
 const String kShareUrl = 'tapiwamakandigona.github.io/fliptide-ci';
 
-String shareText({
-  required Course course,
-  required int? dailyNumber,
-  required double progress,
-  required int attempts,
-  required bool won,
-  required int streak,
-  int cells = 16,
-}) {
+String campaignShareText({required CampaignLevel level, required int attempts, required bool won, required double progress}) {
+  final result = won ? 'CLEARED in $attempts ${attempts == 1 ? "try" : "tries"}' : '${percentOf(progress)}% · attempt $attempts';
+  return '$kGameName · ${level.label} · ${level.name}\n'
+      '$result\nhttps://$kShareUrl/?level=${level.id}';
+}
+
+String shareText({required Course course, required int? dailyNumber, required double progress, required int attempts, required bool won, required int streak, int cells = 16}) {
   final code = seedToCode(course.seed);
   final pct = percentOf(progress);
   final reached = won ? cells : (progress * cells).floor().clamp(0, cells - 1);

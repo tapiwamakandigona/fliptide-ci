@@ -1,7 +1,7 @@
 name: fliptide
 description: "Fliptide — one-tap gravity-flip runner. Tsoro Studios."
 publish_to: 'none'
-version: 0.2.0+3
+version: 0.3.0+4
 
 environment:
   sdk: ^3.12.2
@@ -9,6 +9,8 @@ environment:
 dependencies:
   flame: ^1.38.2
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
   google_mobile_ads: ^9.1.0
   in_app_purchase: ^3.3.0
@@ -33,4 +35,3 @@ flutter:
     - family: Roboto
       fonts:
         - asset: assets/fonts/Roboto-Stub.ttf
-

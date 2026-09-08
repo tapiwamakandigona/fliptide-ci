@@ -20,6 +20,9 @@ class ShareCardData {
     required this.won,
     required this.streak,
     this.deathXs = const [],
+    this.campaignLabel,
+    this.campaignName,
+    this.campaignUrl,
   });
   final int dailyNumber;
   final double progress;
@@ -27,6 +30,9 @@ class ShareCardData {
   final Course course;
   final bool won;
   final int streak;
+  final String? campaignLabel;
+  final String? campaignName;
+  final String? campaignUrl;
 
   /// Every death x of today (tiny ticks under the map).
   final List<double> deathXs;
@@ -40,7 +46,10 @@ Future<Uint8List> renderShareCard(ShareCardData d) async {
 
   void text(String s, double x, double y, double fs, {Color color = Palette.text, FontWeight w = FontWeight.w800, TextAlign align = TextAlign.left, double maxW = size - 160}) {
     final tp = TextPainter(
-      text: TextSpan(text: s, style: TextStyle(fontFamily: 'Inter', color: color, fontSize: fs, fontWeight: w, letterSpacing: fs > 100 ? -4 : 0)),
+      text: TextSpan(
+        text: s,
+        style: TextStyle(fontFamily: 'Inter', color: color, fontSize: fs, fontWeight: w, letterSpacing: fs > 100 ? -4 : 0),
+      ),
       textDirection: TextDirection.ltr,
       textAlign: align,
     )..layout(maxWidth: maxW);
@@ -49,7 +58,7 @@ Future<Uint8List> renderShareCard(ShareCardData d) async {
   }
 
   text('FLIPTIDE', 80, 70, 64, color: Palette.player);
-  text('DAILY #${d.dailyNumber}', size - 80, 84, 40, color: Palette.textDim, align: TextAlign.right);
+  text(d.campaignLabel ?? 'DAILY #${d.dailyNumber}', size - 80, 84, 40, color: Palette.textDim, align: TextAlign.right);
 
   final pct = percentOf(d.progress);
   if (d.won) {
@@ -57,7 +66,15 @@ Future<Uint8List> renderShareCard(ShareCardData d) async {
   } else {
     text('$pct%', size / 2, 200, 260, align: TextAlign.center);
   }
-  text(d.won ? 'in ${d.attempts} ${d.attempts == 1 ? "attempt" : "attempts"}' : 'attempt ${d.attempts} · ${(d.course.length / d.course.speed).round()}s course', size / 2, d.won ? 440 : 500, 52, color: Palette.textDim, w: FontWeight.w600, align: TextAlign.center);
+  text(
+    d.won ? 'in ${d.attempts} ${d.attempts == 1 ? "attempt" : "attempts"}' : 'attempt ${d.attempts} · ${(d.course.length / d.course.speed).round()}s course',
+    size / 2,
+    d.won ? 440 : 500,
+    52,
+    color: Palette.textDim,
+    w: FontWeight.w600,
+    align: TextAlign.center,
+  );
 
   // Course map: one thin bar, hazards as ticks, X where you died.
   const mapL = 80.0;
@@ -73,9 +90,15 @@ Future<Uint8List> renderShareCard(ShareCardData d) async {
     final x = mapL + mapW * (i + 0.5) / n;
     if (col.floorSpike) c.drawRect(Rect.fromLTWH(x - 2, mapY + 4, 4, 14), sp);
     if (col.ceilSpike) c.drawRect(Rect.fromLTWH(x - 2, mapY - 18, 4, 14), sp);
-    if (col.floorH > 0) c.drawRect(Rect.fromLTWH(x - 2, mapY + 8, 4, 10.0 * col.floorH), hz);
-    if (col.ceilH > 0) c.drawRect(Rect.fromLTWH(x - 2, mapY - 8 - 10.0 * col.ceilH, 4, 10.0 * col.ceilH), hz);
-    if (col.isPit) c.drawRect(Rect.fromLTWH(x - 3, mapY + 6, 6, 16), Paint()..color = Palette.bg);
+    if (col.floorH > 0) {
+      c.drawRect(Rect.fromLTWH(x - 2, mapY + 8, 4, 10.0 * col.floorH), hz);
+    }
+    if (col.ceilH > 0) {
+      c.drawRect(Rect.fromLTWH(x - 2, mapY - 8 - 10.0 * col.ceilH, 4, 10.0 * col.ceilH), hz);
+    }
+    if (col.isPit) {
+      c.drawRect(Rect.fromLTWH(x - 3, mapY + 6, 6, 16), Paint()..color = Palette.bg);
+    }
   }
   // Reached portion.
   final reachX = mapL + mapW * d.progress;
@@ -97,8 +120,8 @@ Future<Uint8List> renderShareCard(ShareCardData d) async {
   if (d.streak > 1) {
     text('${d.streak}-day streak', size / 2, 800, 44, color: Palette.textDim, w: FontWeight.w600, align: TextAlign.center);
   }
-  text('Same course for everyone today. Beat it.', size / 2, 930, 40, color: Palette.textDim, w: FontWeight.w600, align: TextAlign.center);
-  text('tapiwamakandigona.github.io/fliptide-ci', size / 2, 990, 34, color: Palette.slabEdge, w: FontWeight.w600, align: TextAlign.center);
+  text(d.campaignName ?? 'Same course for everyone today. Beat it.', size / 2, 930, 40, color: Palette.textDim, w: FontWeight.w600, align: TextAlign.center);
+  text(d.campaignUrl ?? 'tapiwamakandigona.github.io/fliptide-ci', size / 2, 990, d.campaignUrl == null ? 34 : 28, color: Palette.slabEdge, w: FontWeight.w600, align: TextAlign.center);
 
   final img = await rec.endRecording().toImage(size.toInt(), size.toInt());
   final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
