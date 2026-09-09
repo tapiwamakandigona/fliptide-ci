@@ -28,6 +28,8 @@ def main():
     apk = Path(sys.argv[1])
     out = Path(sys.argv[2])
     out.mkdir(parents=True, exist_ok=True)
+    if adb("shell", "getprop", "ro.kernel.qemu")[1].strip() != "1":
+        raise SystemExit("Refusing install: this diagnostic is for a disposable emulator only")
     report = {
         "apk_sha256": hashlib.sha256(apk.read_bytes()).hexdigest(),
         "package": PACKAGE,
