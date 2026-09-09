@@ -56,7 +56,7 @@ def tap_node(nodes, predicate):
     node = found[0]
     if node.get("enabled") != "true":
         raise RuntimeError("Tap target is disabled")
-    x1, y1, x2, y2 = map(int, re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node["bounds"]).groups())
+    x1, y1, x2, y2 = map(int, re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", node.get("bounds", "")).groups())
     adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
 
 
