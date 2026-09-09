@@ -1,0 +1,57 @@
+name: Android exact-release gameplay smoke
+
+on:
+  push:
+    branches: [fix/android-startup-native-sep09]
+    paths:
+      - .github/workflows/android-gameplay-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gameplay:
+    name: Fresh code6 play, retry, persistence and resume
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Download the exact independently checked release
+        uses: actions/download-artifact@v4
+        with:
+          name: fliptide-release-apk
+          run-id: 34339802836
+          github-token: ${{ github.token }}
+          path: candidate
+      - name: Assert exact artifact and original native test
+        run: |
+          echo '186f90ab8bb7f19dc3f114ebf565ad0d7d568d6c3c5e4ee21c552214bdaf6ac1  candidate/app-release.apk' | sha256sum --check --strict
+          echo 'fce1159445f92775ccabee3fd699b17552b410ca1cd5e9c9c94379c3feffc9dd  tool/android/launch_smoke.py' | sha256sum --check --strict
+      - name: Drive native release via observed Android UI
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: |
+            python3 tool/android/launch_smoke.py candidate/app-release.apk evidence/fresh-cold
+            python3 tool/android/play_journey.py evidence/gameplay
+      - name: Retain all runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-gameplay-code6
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
