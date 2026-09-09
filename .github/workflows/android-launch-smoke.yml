@@ -1,0 +1,56 @@
+name: Android shipped-release launch smoke
+
+# Additive incident check. Runs the actual signed release APK, not a debug
+# build or a replacement Dart test. No source rebuild, signing or deployment.
+on:
+  push:
+    branches: [fix/android-startup-native-sep09]
+    paths:
+      - .github/workflows/android-launch-smoke.yml
+      - tool/android/launch_smoke.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  launch-shipped:
+    name: Launch shipped code5 on Android 15
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Download the exact shipped code5 APK
+        uses: actions/download-artifact@v4
+        with:
+          name: fliptide-release-apk
+          run-id: 34313820744
+          github-token: ${{ github.token }}
+          path: shipped
+      - name: Verify immutable shipped binary
+        run: echo '16464b50d482b0e25d8870e76bba6562369e0a67537185fd322bb3a50ba7fd48  shipped/app-release.apk' | sha256sum --check --strict
+      - name: Run unchanged release with native crash capture
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: python3 tool/android/launch_smoke.py shipped/app-release.apk evidence/code5
+      - name: Preserve native launch evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-launch-code5
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
