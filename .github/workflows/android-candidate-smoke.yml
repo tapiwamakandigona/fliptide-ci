@@ -1,0 +1,95 @@
+name: Android candidate release verification
+
+# New artifact consumer only: no source rebuild, signing, store or Pages job.
+# Original shipped-release and headless/release CI files remain unchanged.
+on:
+  push:
+    branches: [fix/android-startup-native-sep09]
+    paths:
+      - .github/workflows/android-candidate-smoke.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  candidate:
+    name: Verify code6 native startup and save-preserving update
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Download exact previous APK for synthetic update fixture
+        uses: actions/download-artifact@v4
+        with:
+          name: fliptide-release-apk
+          run-id: 34313820744
+          github-token: ${{ github.token }}
+          path: previous
+      - name: Download exact new release APK
+        uses: actions/download-artifact@v4
+        with:
+          name: fliptide-release-apk
+          run-id: 34339802836
+          github-token: ${{ github.token }}
+          path: candidate
+      - name: Download exact new release AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: fliptide-release-aab
+          run-id: 34339802836
+          github-token: ${{ github.token }}
+          path: candidate
+      - name: Assert frozen artifact and regression bytes
+        run: |
+          set -euo pipefail
+          echo '16464b50d482b0e25d8870e76bba6562369e0a67537185fd322bb3a50ba7fd48  previous/app-release.apk' | sha256sum --check --strict
+          echo '186f90ab8bb7f19dc3f114ebf565ad0d7d568d6c3c5e4ee21c552214bdaf6ac1  candidate/app-release.apk' | sha256sum --check --strict
+          echo 'e8a2bca2711f4b89c6b47ec789bd91b1edfbb7b1a96d8965ecfbf6b76eb85159  candidate/app-release.aab' | sha256sum --check --strict
+          echo 'fce1159445f92775ccabee3fd699b17552b410ca1cd5e9c9c94379c3feffc9dd  tool/android/launch_smoke.py' | sha256sum --check --strict
+          echo '0f3e8051485ac0b86223c28ba03387259ac283aadeca54ad9507cd67981cedd2  tool/android/check_release_startup.py' | sha256sum --check --strict
+          mkdir -p evidence
+          python3 tool/android/check_release_startup.py candidate/app-release.apk candidate/app-release.aab | tee evidence/constructor.json
+      - name: Independently verify release signatures and bundle
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          "$APKSIGNER" verify --verbose --print-certs candidate/app-release.apk | tee evidence/apksigner.txt
+          grep -q '39cdb292e19291fa044c8bd39396369dfa7cc43cbef07ee7fd3f15880b833a43' evidence/apksigner.txt
+          jarsigner -verify -verbose -certs candidate/app-release.aab > evidence/jarsigner.txt
+          grep -q 'jar verified.' evidence/jarsigner.txt
+          curl --fail --location --silent --show-error -o bundletool.jar https://github.com/google/bundletool/releases/download/1.17.2/bundletool-all-1.17.2.jar
+          java -jar bundletool.jar validate --bundle candidate/app-release.aab > evidence/bundle-validation.txt
+          java -jar bundletool.jar dump manifest --bundle candidate/app-release.aab > evidence/manifest.xml
+      - name: Native code5 to code6 update and original cold-launch regression
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: |
+            python3 tool/android/seed_upgrade_fixture.py seed evidence/upgrade previous/app-release.apk
+            python3 tool/android/launch_smoke.py candidate/app-release.apk evidence/code6
+            python3 tool/android/seed_upgrade_fixture.py verify evidence/upgrade
+      - name: Preserve verification evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-candidate-code6
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
