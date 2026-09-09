@@ -45,7 +45,12 @@ def main():
         if adb("shell", "id", "-u") != "0":
             raise SystemExit("Fixture requires the disposable Google APIs emulator's root shell")
         dump = adb("shell", "dumpsys", "package", PACKAGE)
-        user = re.search(r"\buserId=(\d+)", dump)
+        (out / "installed-code5.txt").write_text(dump)
+        # Android 15 labels this appId (verified in baseline package dump);
+        # older versions used userId. User 0 is required for this fixture.
+        if "User 0:" not in dump:
+            raise SystemExit("Fixture requires the disposable emulator's primary user")
+        user = re.search(r"\b(?:appId|userId)=(\d+)", dump)
         if not user:
             raise SystemExit("Cannot identify fixture owner UID")
         utc_date = adb("shell", "date", "-u", "+%Y-%m-%d")
