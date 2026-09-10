@@ -1,0 +1,17 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+# Android local
+android/local.properties
+android/.gradle/
+android/app/.cxx/
+# Sandbox artefacts
+shots/
+*.log
+# NOTE: android/key.properties and android/signing/ are INTENTIONALLY committed
+# in the private repo (DEMAND §5). The public mirror strips them.

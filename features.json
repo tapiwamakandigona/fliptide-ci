@@ -1,0 +1,202 @@
+{
+  "$comment": "Machine-readable definition of done for PHASE 1 (Fliptide). Only flip passes to true with evidence (a command that ran, an artifact that exists, a URL that answered). Builder never edits verify commands or acceptance criteria — that's a spec change, report it in progress.md. Template: subagent-toolkit v3.0.1.",
+  "features": [
+    {
+      "id": "F-SOUNDTIDE-0.4.0",
+      "title": "Sound, feel, The Deep and a leaner renderer ship together as 0.4.0+7",
+      "acceptance": "Original synthesised soundtrack (two loops) and seven SFX play through an injectable audio service that tests can record; music/SFX/haptics preferences persist and gate cues; The Deep generates a solvable, deterministic, difficulty-ramped corridor with depth scoring, in-place dive-again and persisted best; CLEARED stars animate (static under reduce-motion); renderer allocates no per-frame paints/shaders/paths for static geometry; analyzer clean and every pre-existing test unchanged and green; wasm web build compiles; signed Android build from the public mirror carries versionCode 7.",
+      "verify": "flutter analyze; flutter test (197 pass / 3 old skips); test/zz_render_bench_test.dart before/after; flutter build web --wasm --no-wasm-dry-run; mirror CI signed AAB/APK with cert pin 39cdb292…; Play Console internal-track readback.",
+      "passes": false,
+      "evidence": "2026-09-10: analyzer clean; 197 passed / 3 skips; bench 222 → 175–185 µs/frame (VM software canvas). Audio measured (peak/RMS/crest/DC/loop jump) not auditioned — owner listen is the gate. Web wasm build and mirror CI pending at time of writing; see progress.md."
+    },
+    {
+      "id": "F-TESTER-ONBOARDING-20260909",
+      "title": "Verified closed-test onboarding and honest production-readiness guide",
+      "acceptance": "Document exact Play Console opt-in and feedback destinations, same-account/group/internal-vs-closed pitfalls, optional genuine feedback cadence, latest submitted-versus-live state, and separate recruitment/production gates. Verify published outreach destinations and documentation integrity. Preserve every pre-existing feature object, all application/test/workflow/signing bytes, and the complete previous progress prefix. No new device, tester-count, production or Flutter-suite result is implied.",
+      "verify": "Managed git diff --check, exact documentation-only file allowlist, unchanged baseline feature objects and append-only progress, local-link/secret checks, and primary-source Play/Google/Groups/LinkedIn destination readback.",
+      "passes": true,
+      "evidence": "VERIFIED 2026-09-09: managed diff --check; exact six-file docs/state allowlist; all 17 pre-existing feature objects unchanged; old progress preserved as prefix; three relative links and nine primary-source destinations checked; three LinkedIn shortened URLs resolve to intended group/test destinations; no supplied secret values in changed text. Primary Play activity/Alpha readback now says Published/Available to selected testers for 0.3.0 (4). This closes documentation only: F3/F7 remain false, actual tester recruitment is not proven, and the owner's startup-crash report remains a release blocker."
+    },
+    {
+      "id": "F-ANDROID-RELEASE-JOURNEY-20260909",
+      "title": "Exact release plays, retries and resumes through native UI",
+      "acceptance": "Fresh real code6 APK shows First Light, starts an attempt, reaches death overlay, retries to attempt2, backgrounds/resumes with the same process and attempt, returns to title and persists both deaths. No purchases, ad taps, mocks, app-data clearing, changed application binary or weakened original checks.",
+      "verify": "Additive tool/android/play_journey.py in public CI mirror, exact downloaded APK hash, native XML hierarchy/log/activity evidence and saved preferences.",
+      "passes": false,
+      "evidence": "BLOCKED 2026-09-09: CI34342026072 passes fresh cold starts/title but driver raises element indices must be integers before tap; one attribute-API correction at2c07a09. Single retry34342365734 is blocked by Pixel Launcher isn't responding before gameplay; dumpsys focused ANR belongs to com.google.android.apps.nexuslauncher. No gameplay, retry, resume or real-play persistence pass claimed. Further automatic retries stopped. Original green native+synthetic upgrade evidence remains separate."
+    },
+    {
+      "id": "F-ANDROID-NATIVE-STARTUP-20260909",
+      "title": "Minified release retains Room constructor and starts natively",
+      "acceptance": "Actual code5 APK fails native startup in WorkManager/Room and fails the additive DEX constructor assertion. Narrow R8 constructor fix leaves old tests/checks and SDK/signing/save contracts unchanged. Same-key 0.3.2/code6 APK/AAB pass identical artifact assertion, full analyzer/tests and original byte-identical native cold-launch script; inspect app-specific logs and UI evidence. Affected-phone and purchase gates remain separate.",
+      "verify": "Exact downloaded release hashes, unchanged constructor assertion and native launch script from red to green, original CI/full suite, actual APK/AAB manifest/signature/ZIP/ELF inspection and private/public source parity.",
+      "passes": true,
+      "evidence": "VERIFIED 2026-09-09: exact code5 fails native CI34338978110 and identical DEX check; narrow same-key 0.3.2/code6 built by unchanged CI34339802836 (184 pass/3 old skips, clean analyzer). Both downloaded APK/AAB pass identical constructor, signature/pin, manifest, ABI/ZIP/ELF and bundle validation; dependency metadata and non-app native libraries unchanged. Native CI34340981407 uses byte-identical checker: three cold launches alive/foreground, actual title UI, no app-fatal provider exception, synthetic code5-to-code6 progress retained without uninstall/clear. Actual itel, purchase, performance and Pages gates remain separate and false. See docs/android-startup-incident-sep09.md."
+    },
+    {
+      "id": "F-SAVED-GHOST-RECOVERY-20260909",
+      "title": "Damaged saved ghost does not break the title screen",
+      "acceptance": "Valid replay/progress roundtrip unchanged. Non-numeric, truncated, negative, duplicate, descending and wrong-type ghost values yield an empty in-memory ghost without exceptions or storage writes, preserving valid score/attempts/win/stars/supporter. Real title widget boots with damaged daily ghost. New regression byte-identical from red to green; every original test/check unchanged; full analyzer/tests pass.",
+      "verify": "Existing public-mirror PR analyzer/tests expected-red then green; exact regression hash and private/public source parity; original test/check diff empty.",
+      "passes": true,
+      "evidence": "VERIFIED 2026-09-09: public expected-red CI34322320891 at65e48f7, clean analyzer,177 pass/7 new failures/3 old skips; source-only fix CI34322487346 at6e3b79a9bb9cf3944d5def50c3de96c0c4eaec80, clean analyzer,184 pass/3 old skips. New regression SHA2569ce64c2e8de0992890c061b786f57bdf28fc7e477f0e7f24735f7ff8a15c6085 unchanged; all old tests/checks/workflow unchanged and private/public game bytes equal. Real title widget boots with corrupt ghost; all valid progress/supporter and saved replay bytes preserved. Android/Pages skipped; no build/Play update or affected-phone crash resolution implied. See docs/safe-ghost-loading-sep09.md."
+    },
+    {
+      "id": "F-ANDROID-COMPAT-PACKAGE-20260909",
+      "title": "Same-key higher-version Android compatibility package",
+      "acceptance": "Existing public branch workflow runs clean analysis/tests and produces signed release APK/AAB for com.tsorostudios.fliptide 0.3.1/code5. Only pubspec version differs from the green configuration candidate; old tests/checks/workflows unchanged. Downloads match published artifact ZIP digests; APK/AAB integrity, package/version, non-debuggable flags, application-level EnableImpeller=false and permanent certificate pin verified. No store publication or affected-device resolution implied.",
+      "verify": "Primary Actions job/log evidence, managed diff and private/public byte equality, downloaded artifact digest/ZIP checks, APK signature and merged APK/AAB manifest/certificate inspection.",
+      "passes": true,
+      "evidence": "VERIFIED 2026-09-09: existing manual CI34313820744 at public559b1d51fc3952713fb2efdce65815eefbd9f9bb succeeded; analyzer clean,176 passed/3 old skips, signed APK/AAB, Pages skipped. Downloaded artifact ZIP digests and inner CRCs match; independent apksigner/jarsigner/bundletool checks pass. Both merged manifests: com.tsorostudios.fliptide,0.3.1/code5,minSdk24,targetSdk36,non-debuggable,application EnableImpeller=false; both certificate fingerprints match permanent39cdb292e19291fa044c8bd39396369dfa7cc43cbef07ee7fd3f15880b833a43. See docs/releases/verification-0.3.1.md for hashes and scope. No Play upload or device test; original device/F3/F7 remain false."
+    },
+    {
+      "id": "F-ANDROID-LAUNCH-CONFIG-20260909",
+      "title": "Conservative Android renderer compatibility candidate",
+      "acceptance": "One additive configuration regression fails on the unchanged Android manifest then passes after the official application-level EnableImpeller=false opt-out. Full analyzer/test suite passes with all previous tests/checks unchanged; exact private/public app bytes agree. Package/signing/minSdk/dependencies/Flutter/gameplay/save data/workflows unchanged. This criterion does not claim a device crash reproduction or resolution.",
+      "verify": "Public-mirror test-only red/green CI, exact source/test byte comparison, XML metadata scope check and diff/secret scan.",
+      "passes": true,
+      "evidence": "VERIFIED 2026-09-09: expected-red public CI34312151316 at 07668c1: analyzer clean,175 passed/1 new manifest failure/3 existing skips. Source-only metadata opt-out at mirror1988359/private9e39aea: CI34312326052 analyzer clean,176 passed/3 existing skips; Android/Pages skipped in both. Regression SHA256 a2a92c56cb3e87bdf021705ebd5cd09e18578bc5a31ebb53487c578963bbfbd6 unchanged; no prior tests/checks changed. Configuration candidate only; F-ANDROID-LAUNCH-DEVICE-20260909 and original F3/F7 remain false."
+    },
+    {
+      "id": "F-ANDROID-LAUNCH-DEVICE-20260909",
+      "title": "Affected itel phone launches successfully after a Play update",
+      "acceptance": "Verified higher-version same-key internal Play build installed over the existing save on the affected itel device; repeated cold launches, existing-save access, play/retry and background/resume succeed without a startup crash. Record device model, Android version, build and launch/crash evidence; obtain app-specific crash trace if it fails.",
+      "verify": "Actual affected-device test and installed-build readback; not headless CI, a web browser or a static manifest assertion.",
+      "passes": false,
+      "evidence": "VERIFIED 2026-09-09: owner still reports immediate pre-screen failure after updating (installed version/Android version not yet read back). Actual shipped code5 native crash reproduced; narrow code6 passes original native emulator checks, now Available internal track4700947914971037408/release6 and In review closed Alpha4699887822350597006/release5. Both support previews zero losses; downloaded Play-generated code6 APK retains constructor and checked payload. No affected-itel stack, installed code6 readback or actual gameplay/resume. Do not substitute stock x86_64, synthetic preferences or artifact inspection for this gate. See docs/android-startup-incident-sep09.md."
+    },
+    {
+      "id": "F-CANDIDATE-20260908",
+      "title": "Testing-candidate source and safe public CI handoff",
+      "acceptance": "0.3.0+4 release notes/source target correct Android shipping ancestry; analyzer, full tests and icon reproducibility green; private quality PR open; public mirror game/build bytes verified without private history/secrets; unchanged CI regression result read back or its blocker recorded. Signed artifacts and Play publication are separate gates.",
+      "passes": true,
+      "evidence": "VERIFIED: private PR #11 at 28899e7; public mirror PR #4 at 310634d35841fdbaed9d14cbad602551ff2ca413, 114 allowlisted files byte-identical, no private history/secrets/workflow changes. 175 pass/3 existing skips, analyzer and 16-icon reproducibility checks green. Original public signed CI https://github.com/tapiwamakandigona/fliptide-ci/actions/runs/34245492322 succeeds; independent APK/AAB verification and Play internal code 4 readback in docs/releases/verification-0.3.0.md. Device gates F3/F7 still false."
+    },
+    {
+      "id": "F-FRONTDOOR-20260908",
+      "title": "Readable translated menus with inexpensive reduced-motion backdrop",
+      "acceptance": "fr/es/pt-BR device/manual locale and English fallback; translated title/code/Shallows/result controls, scope note; title and map readable at 320px/1.5x, source physics/generator/IAP and original tests unchanged; backdrop uses cached dust and painter-only repaint, OS reduced motion has no active clock; analyzer and full suite pass.",
+      "passes": true,
+      "evidence": "VERIFIED 2026-09-08 Flutter 3.44.9: analyzer clean, 175 passed / 3 unchanged optional skips; 14 additive locale/layout/clock tests. French Canadian device, unknown-device English fallback, saved override, translated code/start/map/clear flows at 320x640/1.5x text; all Shallows hints/story covered. OS reduced motion has 0 transient callbacks and no scheduled frame; normal animation retains identical CustomPaint/painter for 60 frames. Original tests, sim, IAP and ads diffs empty. No phone FPS or full localization claimed."
+    },
+    {
+      "id": "F-SHALLOWS-20260908",
+      "title": "Deliberately taught Shallows campaign",
+      "acceptance": "Six fixed teach-repeat-combine courses with readable hints, solver and non-frame-perfect reaction-policy replays; stable level ids/stars, revised ghost namespace, valid campaign sharing; generator v1 and existing tests unchanged and green.",
+      "passes": true,
+      "evidence": "VERIFIED 2026-09-08 Flutter 3.44.9: analyzer clean; full suite 161 pass / 3 original optional skips, including 34 additive checks. Six authored solver replays and 24 reaction-policy replays clear with <=7 flips; later 24 courses unchanged. Original tests and generator v1/physics sources unchanged. Warmed host CPU 30 duration labels: median 221849us generation vs 44us metadata, nine repetitions. Not device FPS."
+    },
+    {
+      "id": "F-ICON-20260908",
+      "title": "Original adaptive gravity-flip app identity",
+      "acceptance": "Original launcher art in five legacy densities plus adaptive, round and Android 13 monochrome XML resources; matching web icons; generator reproducible and XML/dimension/alpha checks pass; existing Flutter tests unchanged and green.",
+      "verify": "python3 tool/art/launcher_icon.py --check && flutter analyze && flutter test",
+      "passes": true,
+      "evidence": "2026-09-08: original icon generator and read-only --check pass for 16 rasters and adaptive/round/monochrome XML. Flutter 3.44.9 analyzer clean; 127 shipping-line tests pass / 3 existing optional screenshot skips. Existing tests unchanged. APK launcher installation is not yet verified."
+    },
+    {
+      "id": "F1",
+      "title": "Deterministic sim + solver green",
+      "acceptance": "flutter test passes; a recorded input log replays to the identical death frame; every one of the 365 daily seeds for 2026 is solvable by the BFS solver.",
+      "verify": "flutter test",
+      "passes": true,
+      "evidence": "2026-09-02 07:5xZ `flutter test` → 66 passing in 5 s. Includes: replay of solver solution reproduces identical win frame (sim_test 'determinism'); per-chunk solvability; NEW 365-day sweep: every dailySeed of 2026 generates a solvable course, 0 flat fallbacks, 0 solver-forced chunk rerolls (printed by the test). 198a1d6 added test/death_overlay_test.dart (retry-tap pass-through, 150 ms guard, HUD == overlay percent, percentOf floor pins)."
+    },
+    {
+      "id": "F2",
+      "title": "Web build inside budget on the live Pages deploy",
+      "acceptance": "Per-player transfer <= 6 MB gz, both renderer paths (skwasm for Chromium >= 119; full CanvasKit + main.dart.js for Safari/Firefox/older Chrome): sum of gz transfer for all assets fetched to first playable frame on each path, and first playable frame <= 5.0 s with the network throttled to 10 Mbps, measured on the public Pages URL, numbers written in progress.md. Wording clarified by owner directive 02j-1 (2026-09-02) — clarification of the bar, not a loosening; the package zip size is not the criterion.",
+      "verify": "tool/measure_web.sh <pages-url>  (or Playwright HAR; command and output pasted in evidence)",
+      "passes": true,
+      "evidence": "Live Pages @d78dbc8, 10 Mbps/40 ms RTT, cache off (tool/webtest/measure_web.py, 2026-09-02 06:1xZ): 10 requests, 6.68 MB raw / est 2.85 MB gzip transfer, flutter-first-frame 2.85 s (wall 3.2 s). Bar: gz <=6 MB PASS, first frame <=5 s PASS. Note: raw uncompressed is 6.68 MB (skwasm 3.58 + main.dart.wasm 2.04 + Inter 0.88); the former fonts.gstatic.com Roboto fallback fetch is gone since 8508cdd (Roboto stub family in pubspec); live @198a1d6 and the CrazyGames nested-path check both request only the serving host (KP-4 closed). | 02j-1 (owner): bar is per-player transfer — trim branch numbers 2.32 MB gz (skwasm path) / 4.12 MB gz (canvaskit path), both < 4 s, PASS; evidence unchanged."
+    },
+    {
+      "id": "F3",
+      "title": "Restart under 300 ms",
+      "acceptance": "Death -> new attempt accepting input in <= 300 ms on Android release build and on the web build; measured 10 times, median and max recorded.",
+      "verify": "in-game perf overlay or instrumented log; numbers pasted in evidence",
+      "passes": false,
+      "evidence": "Web (local wasm build, Playwright hammering Space every 20 ms after death): n=9 restart samples 164 166 150 150 167 183 165 200 150 ms → median 165, max 200 (measured with the then-120 ms death-tap guard; guard is 150 ms since 198a1d6 per 02h — worst case ≈230 ms, still under 300). Android release build NOT measured — no device/emulator in the sandbox; needs an owner-side run of the CI APK with ?perf overlay equivalent (debug log)."
+    },
+    {
+      "id": "F4",
+      "title": "Text share first, PNG second",
+      "acceptance": "share_text() returns <= 300 chars, contains 'Fliptide', the course code, death %, attempt count and the Pages/Play link; identical string on web (clipboard) and Android (share sheet); PNG card still available as the second button.",
+      "verify": "flutter test test/share_text_test.dart",
+      "passes": true,
+      "evidence": "2026-09-02 `flutter test test/share_text_test.dart` green (≤300 chars, 'Fliptide', code, %/attempt, link; 4 cases). Live clipboard read via Playwright on Pages: 'Fliptide Daily #245 / 🟩×16 / CLEARED in 1 try / code 5P6-6GR / tapiwamakandigona.github.io/fliptide-ci' (106 chars). Android share sheet = share_plus, same string; PNG CARD button second."
+    },
+    {
+      "id": "F5",
+      "title": "Course codes",
+      "acceptance": "6-char Crockford base32 code encodes seed + generator version; entering a code on the title screen plays that exact course; today's Daily is a code; the same code produces the same course on web and Android (test asserts chunk sequence equality); adding a chunk to the library does not change any previously issued code's course.",
+      "verify": "flutter test test/course_code_test.dart",
+      "passes": true,
+      "evidence": "2026-09-02 `flutter test test/course_code_test.dart` green: 2000-code round trip, O/I/L/U tolerance, version+seed packing, frozen v1 pool (23 names) + golden code 400C1S with pinned chunk sequence, unknown version rejected. Web ?code=ABC123 deep link + CODE dialog verified in browser. Web↔Android equality is by construction (pure Dart, same test) — not separately run on a device."
+    },
+    {
+      "id": "F6",
+      "title": "Three-second readability",
+      "acceptance": "Phone-portrait and desktop-landscape screenshots at 300 px wide show floor, ceiling and player distinguishably; a first-time player is told 'tap to flip' before the first hazard; no text smaller than 12 px at 360x640.",
+      "verify": "screenshots in docs/screens/ inspected and named in evidence",
+      "passes": true,
+      "evidence": "docs/screens/: phone-portrait-air-300w.png + desktop-cleared-live-300w.png (300 px wide) show floor/ceiling/player distinctly; small-360x640-run.png + small-360x640-death.png at exactly 360x640 — HUD 13 px, mini buttons 12 px, no player-facing text < 12 px (the 11→12 bump is in lib/main.dart). Start card: 'tap to start · tap to flip gravity' shown over a 10-tile flat start pad before the first hazard."
+    },
+    {
+      "id": "F7",
+      "title": "Pages build plays end to end",
+      "acceptance": "On the public Pages URL, a run can be completed to the finish (solver-driven ?auto=1 run and a human run), the death and win overlays both render, and progress.md contains the words 'the Pages build plays end to end'.",
+      "verify": "Playwright script in tool/ against the live URL; run id + screenshots in evidence",
+      "passes": false,
+      "evidence": "2026-09-02 06:42Z Playwright on the live URL with ?auto=1: solver flips → CLEARED overlay (docs/screens/desktop-cleared-live.png); death overlay verified in the earlier live run (shots harness). progress.md contains 'the Pages build plays end to end'. HUMAN run still pending — owner-side Discord playtest. Lead desktop playthrough (02h, 390×844): first frame 1.7 s, first-party host only, 0 errors; two defects found and fixed in 198a1d6. Owner runs CI APK on phone; both closures are owner-side, builder does not self-approve."
+    },
+    {
+      "id": "F8",
+      "title": "Renamed to Fliptide everywhere public",
+      "acceptance": "applicationId com.tsorostudios.fliptide; pubspec name/description, web/index.html title + manifest, share text, Pages title and README say Fliptide; sync script points at fliptide-ci; no public surface says 'FLIP'.",
+      "verify": "grep -rn 'FLIP\\b' --include='*.dart' --include='*.html' --include='*.json' --include='*.yaml' --include='*.md' . | grep -v progress.md | grep -v DEMAND.md  (must be empty)",
+      "passes": true,
+      "evidence": "2026-09-02 grep -rn 'FLIP\\b' over dart/html/json/yaml/md excluding progress/DEMAND → only PROJECT.md:1,27 and features.json F8 acceptance (lead's own text). applicationId com.tsorostudios.fliptide; pubspec fliptide; index.html/manifest Fliptide; share text/card Fliptide; CI base href /fliptide-ci/; MIRROR_URL fliptide-ci; README Fliptide."
+    },
+    {
+      "id": "F9",
+      "title": "Signed Android debug-free release build from CI",
+      "acceptance": "fliptide-ci Actions produce APK + AAB signed with the pinned upload cert (SHA-256 39cdb292e19291fa044c8bd39396369dfa7cc43cbef07ee7fd3f15880b833a43); apksigner verify output in evidence. No GitHub Release yet — that needs an owner 'cut'.",
+      "verify": "apksigner verify --print-certs app-release.apk | grep -i sha-256",
+      "passes": true,
+      "evidence": "fliptide-ci run 33596017465 (post-rename, applicationId com.tsorostudios.fliptide) job 100139659686: 'V2 Signer: certificate SHA-256 digest: 39cdb292e19291fa044c8bd39396369dfa7cc43cbef07ee7fd3f15880b833a43' == pinned key; 'Signature OK'; APK + AAB artifacts (fliptide-release-apk / -aab) uploaded, 30-day retention. No GitHub Release cut (owner 'cut' required)."
+    },
+    {
+      "id": "F10",
+      "title": "CrazyGames Basic Launch submission package ready",
+      "acceptance": "Web zip built from the Pages build meets CrazyGames requirements (single-page, <50 MB, no external calls except fonts, works in incognito and with adblock); a 512x512 and 16:9 cover image (original art); a 2-3 sentence description in the owner's voice; all in docs/crazygames/. Submission itself is the owner side's action.",
+      "verify": "ls docs/crazygames/ && unzip -l docs/crazygames/fliptide-web.zip | tail -1",
+      "passes": true,
+      "evidence": "docs/crazygames/: fliptide-web.zip (rebuilt from 198a1d6 after CI green, 44 files, 35.8 MB unzipped, 14.1 MB zip, sha256 a0b99dd254ba24f8a284d497e928f5a3ded5502e37f18b0eb77f9962a49fe8e7; relative base href; renderer self-hosted via custom web/flutter_bootstrap.js canvasKitBaseUrl; no SW; .symbols stripped), cover-1920x1080.png, cover-1280x720.png, icon-512.png (code-drawn original art), description.md (owner's voice), README.md. Verified: nested-path load with all non-first-party hosts blocked → runs, state 'dead:1:7' reached, 0 page errors, only fonts.gstatic.com requested (falls back to bundled Inter). Rebuild: scripts/build_crazygames.sh."
+    },
+    {
+      "id": "F11",
+      "title": "A full game: title screen + The Tides campaign",
+      "acceptance": "App boots to a title screen (PLAY / THE TIDES / DAILY / COURSE CODE). 5 tides x 6 authored courses with a designed difficulty curve (length, speed, chunk tiers rise tide by tide), every course solvable and non-fallback; stars (3/2/1 by attempts in the sitting) persisted; next course unlocks on clear; CLEARED card offers NEXT; the menu is reachable from any run.",
+      "verify": "flutter test (test/campaign_test.dart, test/title_screen_test.dart); flutter test test/screens_test.dart --dart-define=SCREENS=true --update-goldens for docs/screens/menu-*.png campaign-*.png",
+      "passes": true,
+      "evidence": "2026-09-06 `flutter analyze` No issues; `flutter test` 86/86 (75 baseline + 11 new). tool/campaign_probe.dart: 30/30 courses solvable, 0-1 rerolls, nominal 13.2 s (t1l1) -> 28.2 s (t5l6), speeds 6.5 -> 11.0, max tier 1 -> 4. Screens rendered with the bundled Inter font: docs/screens/menu-title.png, menu-tides.png, campaign-start.png, campaign-run.png, campaign-cleared.png. Not yet: device/Android run, Play upload (owner gate)."
+    },
+    {
+      "id": "F12",
+      "title": "Startup ad load rechecks restored Supporter state",
+      "acceptance": "If a Supporter restore arrives while ad initialization is awaiting, no interstitial load occurs afterward. If the PlayScreen is disposed while initialization awaits, no load occurs. A non-supporter still preloads. Existing tests and phase gates remain unchanged.",
+      "verify": "flutter analyze && flutter test; new test/supporter_startup_race_test.dart fails on original app code and passes with the source fix",
+      "passes": true,
+      "evidence": "VERIFIED 2026-09-05: public mirror regression-only run 33946144377 (commit 1f7e1a2) had clean analyze, 97 pass / 2 new failures, both Expected 0 / Actual 1. Source-only fix at e6244bf; unchanged regression file SHA-256 3953a399cc5c5f30af3883711082106a6100762df3f405d7ac3b736b42b71d3a. Retest run 33946239735: No issues found; 99 tests passed, including restored-supporter, disposed-screen, and non-supporter positive control. Android and Pages jobs skipped. Private code and test match the tested public files byte-for-byte. F3/F7 remain false; no device test, new signed build or deployment is claimed."
+    },
+    {
+      "id": "F13",
+      "title": "Course-code dialog preserves the current attempt",
+      "acceptance": "Opening CODE during a run pauses physics without changing the attempt. Cancel or an invalid code resumes the same run. A game already paused stays paused. A valid code navigates to that course without restarting the old one; disposal while the dialog is open does not resume the abandoned game.",
+      "verify": "flutter analyze && flutter test; new test/course_code_dialog_test.dart demonstrates the defect against unchanged app code before the source-only fix",
+      "passes": true,
+      "evidence": "VERIFIED 2026-09-05: public regression-only run 33947097217 at d2cbe845edb48cf0b0601e7624e4675c3a183e84: analyzer clean, 100 pass / 4 new failures (Expected true / Actual false). Source-only fix 51fccda4019a110b1de75f144b1de59a1b7808f7; unchanged test SHA-256 f9956e763f55c48fafd29691f1acfece54afa78ed27f89f5adafc58fe5601f3d. Run 33947233407: No issues found! and 104 tests passed, including all five modal cases. 51 private application/test/dependency/analyzer/workflow files hash-match the public commit's raw Git tree; existing tests/checks unchanged. Android/Pages skipped. F1-F11 unchanged, F3/F7 remain false; no new device/human test or deployment claimed."
+    }
+  ]
+}
