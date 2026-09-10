@@ -21,14 +21,28 @@ class Store {
   static Future<Store> open() async => Store._(await SharedPreferences.getInstance());
 
   DailyRecord daily(int number) {
-    final g = _p.getString('d$number.ghost');
     return DailyRecord(
       number: number,
       best: _p.getDouble('d$number.best') ?? 0,
       attempts: _p.getInt('d$number.attempts') ?? 0,
       won: _p.getBool('d$number.won') ?? false,
-      ghost: g == null || g.isEmpty ? const [] : g.split(',').map(int.parse).toList(),
+      ghost: _readGhost(_p.get('d$number.ghost')),
     );
+  }
+
+  /// A replay is optional; damaged replay data must not break the title or
+  /// discard earned progress. Never splice a partial replay or rewrite prefs.
+  static List<int> _readGhost(Object? value) {
+    if (value is! String || value.isEmpty) return const [];
+    final frames = <int>[];
+    var previous = -1;
+    for (final token in value.split(',')) {
+      final frame = int.tryParse(token);
+      if (frame == null || frame <= previous) return const [];
+      frames.add(frame);
+      previous = frame;
+    }
+    return frames;
   }
 
   Future<void> save(DailyRecord r) async {
