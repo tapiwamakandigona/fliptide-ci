@@ -15,6 +15,7 @@ import '../sim/course.dart';
 import '../sim/checkpoint.dart';
 import '../sim/physics.dart';
 import 'palette.dart';
+import 'scenery.dart';
 
 /// What the game tells the Flutter shell.
 abstract class FlipListener {
@@ -148,6 +149,9 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
   final Paint _finishPaint = Paint()..strokeCap = StrokeCap.round;
   final Paint _markerPaint = Paint()..strokeCap = StrokeCap.round;
   final Paint _flashPaint = Paint();
+  final Paint _glowPaint = Paint();
+  double _glowR = 1;
+  final Scenery _scenery = Scenery();
   Path _spikeUp = Path();
   Path _spikeDown = Path();
   Path _spikeGlowUp = Path();
@@ -172,6 +176,12 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     final shadowH = t * 0.35;
     _topShadowPaint.shader = Gradient.linear(Offset(0, corridorTop), Offset(0, corridorTop + shadowH), [Palette.shadow, Palette.shadow.withValues(alpha: 0)]);
     _botShadowPaint.shader = Gradient.linear(Offset(0, corridorBot), Offset(0, corridorBot - shadowH), [Palette.shadow, Palette.shadow.withValues(alpha: 0)]);
+    _glowR = t * 1.6;
+    _glowPaint.shader = Gradient.radial(Offset.zero, _glowR, [
+      Palette.player.withValues(alpha: 0.30),
+      Palette.player.withValues(alpha: 0.10),
+      Palette.player.withValues(alpha: 0),
+    ], [0, 0.45, 1]);
     _edgePaint.strokeWidth = math.max(2.0, t * 0.08);
     _wallPaint.strokeWidth = math.max(1.5, t * 0.05);
     _finishPaint.strokeWidth = math.max(3, t * 0.12);
@@ -520,10 +530,24 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     // lit inner edge and a soft shadow cast into the corridor.
     final slab = _slabPaint;
     // The slabs darken away from the corridor so the play band is the bright core.
-    final topSlab = Rect.fromLTRB(0, 0, w, corridorTop);
-    final botSlab = Rect.fromLTRB(0, corridorBot, w, vh);
-    if (topSlab.height > 0) canvas.drawRect(topSlab, _topSlabPaint);
-    if (botSlab.height > 0) canvas.drawRect(botSlab, _botSlabPaint);
+    // Tidelight (0.4.1): a night coast above the ceiling and a moonlit sea
+    // below the floor fill what used to be two flat slabs; the slabs shrink
+    // to a solid crust along the corridor so floor and ceiling still read as
+    // walls. Render-only (see scenery.dart).
+    final crustTop = math.min(corridorTop, t * 0.55);
+    final crustBot = math.min(vh - corridorBot, t * 0.55);
+    _scenery.render(
+      canvas,
+      w: w,
+      vh: vh,
+      t: t,
+      top: corridorTop - crustTop,
+      bot: corridorBot + crustBot,
+      camX: camX,
+      clock: _clock,
+    );
+    if (crustTop > 0) canvas.drawRect(Rect.fromLTRB(0, corridorTop - crustTop, w, corridorTop), _topSlabPaint);
+    if (crustBot > 0) canvas.drawRect(Rect.fromLTRB(0, corridorBot, w, corridorBot + crustBot), _botSlabPaint);
     final edge = _edgePaint;
     final edgeW = edge.strokeWidth;
     final shadowH = t * 0.35;
@@ -535,8 +559,8 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     final seam = _seamPaint;
     for (var cx = firstCol; cx <= firstCol + tilesAcross + 1; cx++) {
       final x = sx(cx.toDouble());
-      canvas.drawLine(Offset(x, 0), Offset(x, corridorTop - edgeW), seam);
-      canvas.drawLine(Offset(x, corridorBot + edgeW), Offset(x, vh), seam);
+      canvas.drawLine(Offset(x, corridorTop - crustTop), Offset(x, corridorTop - edgeW), seam);
+      canvas.drawLine(Offset(x, corridorBot + edgeW), Offset(x, corridorBot + crustBot), seam);
     }
 
     // Columns.
@@ -621,6 +645,12 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     // Player. On CLEARED it fades out over kWonFadeS so the overlay caption
     // never has the sprite drawn on top of it (directive 02j-3).
     if (sim.s.state != RunState.dead && playerAlpha > 0) {
+      // The last spark: a warm glow that also lights the nearby walls.
+      canvas.save();
+      canvas.translate(sx(px) + t * 0.4, sy(py) - t * 0.4);
+      _glowPaint.color = Color.fromRGBO(0, 0, 0, playerAlpha);
+      canvas.drawCircle(Offset.zero, _glowR, _glowPaint);
+      canvas.restore();
       _drawCreature(
         canvas,
         sx(px),

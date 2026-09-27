@@ -822,3 +822,20 @@ stacked draft; all-game completion is not claimed.
 - Failures on the way (verbatim): `A Timer is still pending even after the widget tree was disposed.` — twice: star-chime Future.delayed (fixed: cancelable Timers cancelled in dispose) and Feel.win's 90 ms double-tap (fixed: single heavyImpact). `setState() or markNeedsBuild() called during build` from starting a freshly constructed FlipGame before onLoad (fixed: swap the course in place instead of rebuilding the game).
 - `dart format` accidentally reflowed flip_game.dart/title_screen.dart (734/488-line diffs); reverted to HEAD and re-applied the edits so the diff stays reviewable. main.dart was already formatted.
 - VERIFIED: analyzer clean; `flutter test` 197 passed / 3 pre-existing skips. Bench 222 → 175–185 µs/frame (VM). Audio metrics in docs/releases/v0.4.0.md. NOT verified: by-ear audio quality, device frame time, Android haptics feel.
+
+
+## 2026-09-10 — 0.4.0 (7) on Play internal + closed Alpha
+
+VERIFIED: mirror CI 34482935621 green; downloaded APK versionCode 7 / 0.4.0,
+signer pin 39cdb292…b833a43 OK; AAB sha256
+dd984747ac40b246a29ce5c7a3a002140771b023d4774e2032207e5469e3e860. Play
+internal 7 (0.4.0) "Available to internal testers" (10 Sept 07:18 console
+time); promoted to Closed testing – Alpha, full roll-out, review cleared the
+same morning: "Available to selected testers", 177 countries (07:49).
+Production untouched. Upload lesson: a reloaded prepare page drops the
+in-progress upload but the processed bundle is in "Add from library".
+
+Open before production: owner listens to `assets/audio/music_run.ogg`,
+`music_title.ogg` and the SFX on a phone and plays one Deep run; if the
+music does not land, swap the two loops behind `FlipAudio` for human-composed
+CC0 tracks (one-file change, no code path changes).
