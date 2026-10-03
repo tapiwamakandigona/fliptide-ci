@@ -58,6 +58,28 @@ skipped); 5 original creature skins; 6 beat-snapped flip SFX; 7 death-clip
 export; 8 owner listen-through. Not done here: tag, signed build, GitHub
 release (release step), anything on Play (on hold since 14:33 UTC).
 
+**Status 2026-10-03 16:28 UTC — release review.** An independent read-only
+review of 2560ffb..0460b25 returned PASS (0 blocking, 0 major, 3 minor,
+5 nits). Fixed before release on `fix/zero-size-scenery-20261003`: a
+zero-size view no longer throws while building the sea (new tests, seen red
+first), the `_confetti` doc comment is back on `_confetti`, a real-game test
+pins the per-attempt near-miss reset, and the notes now say what wide screens
+show. Gate: analyzer clean, 219 passed / 3 skipped. Version stays 0.5.0+9
+(nothing was built from 0460b25). Review notes left for later, after the
+backlog above:
+- Wide/desktop screens: beyond the crust the old slab colour is now the dark
+  background (an 86 px band at 1920x1080). It is by design ("crust only"
+  in `F-OCT-TIDELIGHT-20261003`), but it's an art call: keep it dark or fill
+  it with the slab gradient.
+- Near-miss edge cases (render-only): a long spike row fires once the back
+  edge clears its first column, and landing on top of a raised block close
+  to its edge reads as a wall near miss.
+- The glow flare and alarmed eyes hold still during the win fade.
+- Tests do not yet assert the pupil/eye-size/mouth drawing, the 16-spark
+  burst or the 0.4 s flare (code + headless captures only).
+- Small per-frame allocations remain in `scenery.dart` (list literal,
+  `Float32List.sublistView`); no Paint/Path/Shader is rebuilt per frame.
+
 ## Active tester-onboarding pass — 2026-09-09
 
 Canonical `subagent-toolkit` main was cloned and HARNESS.md read in full;

@@ -486,8 +486,6 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     }
   }
 
-  /// CLEARED: a short shower in finish-green and white (never player-yellow,
-  /// so the caption rect stays clean — directive 02j-3).
   /// A small burst of sparks streaming back from the spark after a near miss.
   void _nearBurst(SimState s) {
     final rnd = math.Random(s.frame + 7);
@@ -512,6 +510,8 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     }
   }
 
+  /// CLEARED: a short shower in finish-green and white (never player-yellow,
+  /// so the caption rect stays clean — directive 02j-3).
   void _confetti(SimState s) {
     final rnd = math.Random(s.frame + 99);
     for (var i = 0; i < 22; i++) {

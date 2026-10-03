@@ -124,3 +124,38 @@ means that archive file.
   passed / 3 skipped.
 - Not done in this pass (by scope): tag, signed build, GitHub release; no
   Play/AdMob/CrazyGames action (owner hold 14:33 UTC).
+
+## 2026-10-03 16:28 UTC — Release review and pre-release fixes
+
+- An independent read-only review of `2560ffb..0460b25` returned **PASS**:
+  0 blocking, 0 major, 3 minor, 5 nits. Merge trees match the PR heads, the
+  cherry-pick is the same patch as `2cd4780`, nothing changed under
+  `lib/sim`, `assets`, `android`, `web`, `ios`, `.github` or
+  `pubspec.lock`, and every claim in the notes is backed by code.
+- Fixed on `fix/zero-size-scenery-20261003` (render-only):
+  - `Scenery.render` returns early when the view or tile is zero. Before
+    this, a zero-width view made the wave length 0, and `(0/0).ceil()`
+    threw inside `FlipGame.render`. 0.4.0 did not throw there.
+  - The `_confetti` doc comment is back on `_confetti`; `_nearBurst` keeps
+    its own.
+  - The notes now say what wide screens show: the corridor keeps its solid
+    edges and the night beyond them stays dark.
+- Correction to the 16:06 entry above: the near-miss *count* resets with
+  each attempt (`_reset()`). A checkpoint resume resets the tracker and the
+  flare, not the count. That is deliberate, since a resume is not a retry.
+- VERIFIED red→green:
+  - Before the fix, both new tests in `test/tidelight_scenery_test.dart`
+    ("zero-size viewport (hidden embed): no exception, then recovers" and
+    "full game survives a zero-size viewport and a resize back") failed
+    with "Unsupported operation: Infinity or NaN toInt" at
+    `scenery.dart 188:39 Scenery._rebuild`. After the fix both pass.
+  - `test/near_miss_test.dart` "the count resets with each attempt" passes
+    before and after; it pins behaviour that already existed. The `run`
+    helper was split into `start` + `_play` without changing what it does.
+- VERIFIED gate (Flutter 3.44.9): `flutter analyze` No issues found;
+  `flutter test` 219 passed / 3 skipped.
+- Remaining review notes are backlogged in `PROJECT.md` (dark band beyond
+  the crust on wide screens, near-miss edge cases, win-fade freeze, test
+  gaps for the drawing, small per-frame allocations).
+- ASSUMED: nothing here changes how it looks on a phone; the guard only
+  affects zero-size views.

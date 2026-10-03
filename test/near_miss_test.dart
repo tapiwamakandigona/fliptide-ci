@@ -34,11 +34,21 @@ Course withColumn(int at, Column hazard, {int length = 60}) {
 /// Runs a game on [course]; flips once when the raw gaze alarm first reaches
 /// [flipAt] (never if null). Returns (near misses, died).
 Future<(int, bool)> run(Course course, {double? flipAt, int frames = 600}) async {
+  final (game, l) = await start(course);
+  _play(game, l, course, flipAt: flipAt, frames: frames);
+  return (game.nearMisses, l.dead);
+}
+
+Future<(FlipGame, _L)> start(Course course) async {
   final l = _L();
   final game = FlipGame(course: course, listener: l);
   game.onGameResize(Vector2(390, 844));
   await game.onLoad();
   game.press(); // start
+  return (game, l);
+}
+
+void _play(FlipGame game, _L l, Course course, {double? flipAt, int frames = 600}) {
   var flipped = false;
   for (var i = 0; i < frames && !l.dead; i++) {
     if (!flipped && flipAt != null && sparkGaze(course, game.sim.s.x, game.sim.s.side).alarm >= flipAt) {
@@ -50,7 +60,6 @@ Future<(int, bool)> run(Course course, {double? flipAt, int frames = 600}) async
     game.render(ui.Canvas(rec));
     rec.endRecording().dispose();
   }
-  return (game.nearMisses, l.dead);
 }
 
 void main() {
@@ -107,6 +116,19 @@ void main() {
       final (n, died) = await run(withColumn(14, const Column(floorSpike: true)));
       expect(died, isTrue);
       expect(n, 0);
+    });
+
+    test('the count resets with each attempt', () async {
+      final course = withColumn(14, const Column(floorSpike: true));
+      final (game, l) = await start(course);
+      _play(game, l, course, flipAt: 0.7);
+      expect(l.dead, isFalse);
+      expect(game.nearMisses, 1);
+      game.retry(); // a new attempt
+      expect(game.nearMisses, 0);
+      _play(game, l, course, flipAt: 0.7);
+      expect(l.dead, isFalse);
+      expect(game.nearMisses, 1, reason: 'counted again in the new attempt');
     });
   });
 }

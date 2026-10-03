@@ -86,6 +86,43 @@ void main() {
     expect(s.hasSky, isTrue);
   });
 
+  test('zero-size viewport (hidden embed): no exception, then recovers', () {
+    final s = Scenery();
+    _draw(s, w: 0, vh: 800, t: 0, top: 0, bot: 800);
+    _draw(s, w: 0, vh: 0, t: 0, top: 0, bot: 0);
+    expect(s.hasSky, isFalse);
+    expect(s.hasSea, isFalse);
+    _draw(s, w: 390, vh: 844, t: 390 / 9, top: 250, bot: 594);
+    expect(s.hasSky, isTrue);
+    expect(s.hasSea, isTrue);
+  });
+
+  test('full game survives a zero-size viewport and a resize back', () async {
+    final gen = kCampaign[0].buildCourse();
+    final game = FlipGame(
+      course: gen.course,
+      listener: _L(),
+      autoFlips: gen.solution.flips,
+    );
+    game.onGameResize(Vector2.zero());
+    await game.onLoad();
+    game.press();
+    void frame() {
+      game.update(1 / 60);
+      final rec = ui.PictureRecorder();
+      game.render(ui.Canvas(rec));
+      rec.endRecording().dispose();
+    }
+
+    for (var i = 0; i < 10; i++) {
+      frame();
+    }
+    game.onGameResize(Vector2(390, 844));
+    for (var i = 0; i < 10; i++) {
+      frame();
+    }
+  });
+
   test(
     'full game renders 300 frames in portrait with the new scenery',
     () async {

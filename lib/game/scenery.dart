@@ -216,6 +216,9 @@ class Scenery {
     required double camX,
     required double clock,
   }) {
+    // A zero-size view (hidden embed, split-screen transition) has nothing to
+    // draw, and a zero tile would make the wave paths divide 0 by 0.
+    if (w <= 0 || vh <= 0 || t <= 0) return;
     if (w != _w || vh != _vh || t != _t || top != _top || bot != _bot) {
       _rebuild(w, vh, t, top, bot);
     }
