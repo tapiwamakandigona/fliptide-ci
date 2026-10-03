@@ -14,7 +14,9 @@ import 'package:flutter/widgets.dart' show KeyEventResult;
 import '../sim/course.dart';
 import '../sim/checkpoint.dart';
 import '../sim/physics.dart';
+import 'gaze.dart';
 import 'palette.dart';
+import 'scenery.dart';
 
 /// What the game tells the Flutter shell.
 abstract class FlipListener {
@@ -91,6 +93,23 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
   /// Airborne stretch factor 0..1 derived from |vy|.
   double _stretch = 0;
 
+  /// What the spark is looking at, eased (render-only, see gaze.dart).
+  double _alarm = 0;
+  GazeHazard _gazeKind = GazeHazard.none;
+
+  /// Eased alarm 0..1 the eyes are drawn with (for tests).
+  @visibleForTesting
+  double get sparkAlarm => _alarm;
+
+  /// Last-moment escapes this attempt (render-only: sparks + glow pulse).
+  final NearMissTracker _nearMiss = NearMissTracker();
+  int _nearMisses = 0;
+  double _nearT = 0;
+
+  /// Near misses in the current attempt (for tests).
+  @visibleForTesting
+  int get nearMisses => _nearMisses;
+
   /// Fixed-step samples for the motion trail (world tiles).
   final List<_Trail> _trail = [];
 
@@ -139,6 +158,13 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
   final Paint _edgePaint = Paint()..color = Palette.slabEdge;
   final Paint _wallPaint = Paint()..color = Palette.slabEdge.withValues(alpha: 0.55);
   final Paint _particlePaint = Paint();
+  // Creature paints, recoloured per draw instead of allocated per draw.
+  final Paint _cShadow = Paint();
+  final Paint _cBody = Paint();
+  final Paint _cBelly = Paint();
+  final Paint _cGloss = Paint();
+  final Paint _cEyeWhite = Paint();
+  final Paint _cEyeDark = Paint();
   final Paint _interiorPaint = Paint();
   final Paint _topSlabPaint = Paint();
   final Paint _botSlabPaint = Paint();
@@ -148,6 +174,9 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
   final Paint _finishPaint = Paint()..strokeCap = StrokeCap.round;
   final Paint _markerPaint = Paint()..strokeCap = StrokeCap.round;
   final Paint _flashPaint = Paint();
+  final Paint _glowPaint = Paint();
+  double _glowR = 1;
+  final Scenery _scenery = Scenery();
   Path _spikeUp = Path();
   Path _spikeDown = Path();
   Path _spikeGlowUp = Path();
@@ -172,6 +201,12 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     final shadowH = t * 0.35;
     _topShadowPaint.shader = Gradient.linear(Offset(0, corridorTop), Offset(0, corridorTop + shadowH), [Palette.shadow, Palette.shadow.withValues(alpha: 0)]);
     _botShadowPaint.shader = Gradient.linear(Offset(0, corridorBot), Offset(0, corridorBot - shadowH), [Palette.shadow, Palette.shadow.withValues(alpha: 0)]);
+    _glowR = t * 1.6;
+    _glowPaint.shader = Gradient.radial(Offset.zero, _glowR, [
+      Palette.player.withValues(alpha: 0.30),
+      Palette.player.withValues(alpha: 0.10),
+      Palette.player.withValues(alpha: 0),
+    ], [0, 0.45, 1]);
     _edgePaint.strokeWidth = math.max(2.0, t * 0.08);
     _wallPaint.strokeWidth = math.max(1.5, t * 0.05);
     _finishPaint.strokeWidth = math.max(3, t * 0.12);
@@ -219,6 +254,11 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     _flipAnim = 1;
     _visSide = Side.floor;
     _stretch = 0;
+    _alarm = 0;
+    _gazeKind = GazeHazard.none;
+    _nearMiss.reset();
+    _nearMisses = 0;
+    _nearT = 0;
     _shakeT = 0;
     _flash = 0;
     _ghost = _ghostFlips.isEmpty ? null : Sim(course);
@@ -261,6 +301,10 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     _trail.clear();
     _flipAnim = 1;
     _visSide = sim.s.side;
+    _alarm = 0;
+    _gazeKind = GazeHazard.none;
+    _nearMiss.reset();
+    _nearT = 0;
     _shakeT = 0;
     _flash = 0;
     _deathAt = null; // not a restart: keep F3 timings honest
@@ -390,6 +434,19 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     // Exponential easing avoids the refresh-dependent linear clamp factor.
     final target = sim.s.grounded ? 0.0 : (sim.s.vy.abs() / 22).clamp(0.0, 1.0);
     _stretch += (target - _stretch) * (1 - math.exp(-clamped * 18));
+    // The spark watches the next hazard on its surface: eyes widen fast and
+    // relax slowly, so a near miss reads as a near miss.
+    final gaze = sim.s.state == RunState.running ? sparkGaze(course, sim.s.x, sim.s.side) : Gaze.calm;
+    if (gaze.kind != GazeHazard.none) _gazeKind = gaze.kind;
+    final rate = gaze.alarm > _alarm ? 22.0 : 5.0;
+    _alarm += (gaze.alarm - _alarm) * (1 - math.exp(-clamped * rate));
+    if (_alarm < 0.01 && gaze.kind == GazeHazard.none) _gazeKind = GazeHazard.none;
+    if (_nearT > 0) _nearT = math.max(0, _nearT - clamped);
+    if (sim.s.state == RunState.running && _nearMiss.step(gaze, sim.s.x)) {
+      _nearMisses++;
+      _nearT = kNearMissS;
+      _nearBurst(sim.s);
+    }
     if (sim.s.state == RunState.running) listener.onProgress(sim.progress);
   }
 
@@ -425,6 +482,30 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
       final vy = dir * (0.5 + rnd.nextDouble() * 2.5);
       _particles.add(
         _Particle(s.x + 0.1 + rnd.nextDouble() * 0.6, y, vx, vy, 0.25 + rnd.nextDouble() * 0.2, size: 0.08 + rnd.nextDouble() * 0.08, color: Palette.dust, gravity: 0, drag: 4, round: true),
+      );
+    }
+  }
+
+  /// A small burst of sparks streaming back from the spark after a near miss.
+  void _nearBurst(SimState s) {
+    final rnd = math.Random(s.frame + 7);
+    final away = s.side == Side.floor ? 1.0 : -1.0; // world-y towards the surface it escaped
+    for (var i = 0; i < 16; i++) {
+      final a = math.pi + (rnd.nextDouble() - 0.5) * 1.4; // backwards
+      final sp = 5 + rnd.nextDouble() * 6;
+      _particles.add(
+        _Particle(
+          s.x + 0.2,
+          s.y + 0.4,
+          math.cos(a) * sp,
+          math.sin(a) * sp * 0.6 + away * rnd.nextDouble() * 2,
+          0.6 + rnd.nextDouble() * 0.3,
+          size: 0.09 + rnd.nextDouble() * 0.07,
+          color: i.isEven ? Palette.player : Palette.spikeTip,
+          gravity: 0,
+          drag: 3,
+          round: true,
+        ),
       );
     }
   }
@@ -520,10 +601,24 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     // lit inner edge and a soft shadow cast into the corridor.
     final slab = _slabPaint;
     // The slabs darken away from the corridor so the play band is the bright core.
-    final topSlab = Rect.fromLTRB(0, 0, w, corridorTop);
-    final botSlab = Rect.fromLTRB(0, corridorBot, w, vh);
-    if (topSlab.height > 0) canvas.drawRect(topSlab, _topSlabPaint);
-    if (botSlab.height > 0) canvas.drawRect(botSlab, _botSlabPaint);
+    // Tidelight (0.4.1): a night coast above the ceiling and a moonlit sea
+    // below the floor fill what used to be two flat slabs; the slabs shrink
+    // to a solid crust along the corridor so floor and ceiling still read as
+    // walls. Render-only (see scenery.dart).
+    final crustTop = math.min(corridorTop, t * 0.55);
+    final crustBot = math.min(vh - corridorBot, t * 0.55);
+    _scenery.render(
+      canvas,
+      w: w,
+      vh: vh,
+      t: t,
+      top: corridorTop - crustTop,
+      bot: corridorBot + crustBot,
+      camX: camX,
+      clock: _clock,
+    );
+    if (crustTop > 0) canvas.drawRect(Rect.fromLTRB(0, corridorTop - crustTop, w, corridorTop), _topSlabPaint);
+    if (crustBot > 0) canvas.drawRect(Rect.fromLTRB(0, corridorBot, w, corridorBot + crustBot), _botSlabPaint);
     final edge = _edgePaint;
     final edgeW = edge.strokeWidth;
     final shadowH = t * 0.35;
@@ -535,8 +630,8 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     final seam = _seamPaint;
     for (var cx = firstCol; cx <= firstCol + tilesAcross + 1; cx++) {
       final x = sx(cx.toDouble());
-      canvas.drawLine(Offset(x, 0), Offset(x, corridorTop - edgeW), seam);
-      canvas.drawLine(Offset(x, corridorBot + edgeW), Offset(x, vh), seam);
+      canvas.drawLine(Offset(x, corridorTop - crustTop), Offset(x, corridorTop - edgeW), seam);
+      canvas.drawLine(Offset(x, corridorBot + edgeW), Offset(x, corridorBot + crustBot), seam);
     }
 
     // Columns.
@@ -621,6 +716,15 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     // Player. On CLEARED it fades out over kWonFadeS so the overlay caption
     // never has the sprite drawn on top of it (directive 02j-3).
     if (sim.s.state != RunState.dead && playerAlpha > 0) {
+      // The last spark: a warm glow that also lights the nearby walls.
+      canvas.save();
+      canvas.translate(sx(px) + t * 0.4, sy(py) - t * 0.4);
+      _glowPaint.color = Color.fromRGBO(0, 0, 0, playerAlpha);
+      // A near miss flares the glow for kNearMissS.
+      final flare = _nearT > 0 ? _nearT / kNearMissS : 0.0;
+      if (flare > 0) canvas.scale(1 + 0.6 * flare);
+      canvas.drawCircle(Offset.zero, _glowR, _glowPaint);
+      canvas.restore();
       _drawCreature(
         canvas,
         sx(px),
@@ -633,7 +737,9 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
         fromSide: _visSide,
         stretch: _stretch,
         vy: sim.s.vy,
-        blink: _blink,
+        blink: _blink && _alarm < 0.5,
+        alarm: _alarm,
+        lookDown: _gazeKind == GazeHazard.spike || _gazeKind == GazeHazard.pit,
       );
     }
 
@@ -714,6 +820,8 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     double vy = 0,
     bool blink = false,
     double scale = 1,
+    double alarm = 0,
+    bool lookDown = false,
   }) {
     const pw = 0.8;
     const ph = 0.8;
@@ -747,32 +855,48 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
     final body = RRect.fromRectAndRadius(Rect.fromLTWH(left, top, w, h), Radius.circular(t * 0.18));
     if (!ghost) {
       // Soft drop shadow towards the surface.
-      canvas.drawRRect(body.shift(Offset(0, -upNow * t * 0.05)), Paint()..color = Palette.shadow.withValues(alpha: 0.35 * color.a));
+      canvas.drawRRect(body.shift(Offset(0, -upNow * t * 0.05)), _cShadow..color = Palette.shadow.withValues(alpha: 0.35 * color.a));
     }
-    canvas.drawRRect(body, Paint()..color = color);
+    canvas.drawRRect(body, _cBody..color = color);
     if (ghost) {
       canvas.restore();
       return;
     }
     // Belly shade on the surface side, highlight on the sky side.
     final bellyTop = upNow < 0 ? top + h * 0.7 : top;
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(left, bellyTop, w, h * 0.3), Radius.circular(t * 0.14)), Paint()..color = Palette.playerDark.withValues(alpha: 0.5 * color.a));
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(left, bellyTop, w, h * 0.3), Radius.circular(t * 0.14)), _cBelly..color = Palette.playerDark.withValues(alpha: 0.5 * color.a));
     final glossTop = upNow < 0 ? top + h * 0.08 : top + h * 0.78;
     canvas.drawRRect(
       RRect.fromRectAndRadius(Rect.fromLTWH(left + w * 0.12, glossTop, w * 0.5, h * 0.14), Radius.circular(t * 0.1)),
-      Paint()..color = Palette.spikeTip.withValues(alpha: 0.22 * color.a),
+      _cGloss..color = Palette.spikeTip.withValues(alpha: 0.22 * color.a),
     );
     // Eyes: near the leading (right) edge, on the side away from the surface,
-    // glancing up or down with vertical speed.
+    // glancing up or down with vertical speed. With danger ahead they widen
+    // and the pupils slide forward (and towards the surface for spikes and
+    // pits); at high alarm a small "o" mouth opens under them.
+    final a = alarm.clamp(0.0, 1.0);
     final eyeY = (eyeDir < 0 ? top + h * 0.34 : top + h * 0.66) + (vy.clamp(-20, 20) / 20) * -upNow * h * 0.03;
-    final eyeR = t * 0.11 * scale;
+    final eyeR = t * 0.11 * scale * (1 + 0.28 * a);
+    final eyeDark = _cEyeDark..color = Palette.eyeDark.withValues(alpha: color.a);
+    final eyeWhite = _cEyeWhite..color = const Color(0xFFFFFFFF).withValues(alpha: color.a);
+    final pupilDx = eyeR * (0.35 + 0.12 * a);
+    final pupilDy = eyeDir * eyeR * 0.1 + (lookDown ? -upNow * eyeR * 0.3 * a : 0.0);
+    final pupilR = eyeR * (0.5 - 0.08 * a);
     for (final ex in [left + w * 0.52, left + w * 0.78]) {
       if (blink) {
-        canvas.drawRect(Rect.fromCenter(center: Offset(ex, eyeY), width: eyeR * 2, height: math.max(1.5, eyeR * 0.35)), Paint()..color = Palette.eyeDark.withValues(alpha: color.a));
+        canvas.drawRect(Rect.fromCenter(center: Offset(ex, eyeY), width: eyeR * 2, height: math.max(1.5, eyeR * 0.35)), eyeDark);
         continue;
       }
-      canvas.drawCircle(Offset(ex, eyeY), eyeR, Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: color.a));
-      canvas.drawCircle(Offset(ex + eyeR * 0.35, eyeY + eyeDir * eyeR * 0.1), eyeR * 0.5, Paint()..color = Palette.eyeDark.withValues(alpha: color.a));
+      canvas.drawCircle(Offset(ex, eyeY), eyeR, eyeWhite);
+      canvas.drawCircle(Offset(ex + pupilDx, eyeY + pupilDy), pupilR, eyeDark);
+    }
+    if (a > 0.55) {
+      final m = (a - 0.55) / 0.45; // 0..1
+      final mouthY = eyeY - eyeDir * h * 0.24;
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(left + w * 0.66, mouthY), width: t * 0.1 * scale * (0.6 + 0.4 * m), height: t * 0.12 * scale * m),
+        eyeDark,
+      );
     }
     canvas.restore();
   }
@@ -781,6 +905,7 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
 /// Render-only tuning.
 const double kFlipAnimS = 0.16;
 const double kShakeS = 0.28;
+const double kNearMissS = 0.4;
 const double kFlashS = 0.35;
 const int kTrailLen = 5;
 // Sample at 60 Hz so high-refresh screens do not shorten the trail.
