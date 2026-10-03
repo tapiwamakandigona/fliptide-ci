@@ -1,7 +1,7 @@
 name: fliptide
 description: "Fliptide — one-tap gravity-flip runner. Tsoro Studios."
 publish_to: 'none'
-version: 0.4.0+7
+version: 0.5.0+9
 
 environment:
   sdk: ^3.12.2

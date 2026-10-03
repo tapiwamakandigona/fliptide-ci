@@ -1,5 +1,63 @@
 # PROJECT.md — Fliptide (was working title "FLIP")
 
+## October 2026 quality pass — 2026-10-03
+
+**Goal.** One quality pass on Fliptide under the owner brief of 2026-10-02
+(verbatim in `PLAN.md` §1): better graphics, character, animation and
+controls, fix rough edges, use any useful unmerged work — then package a
+release. Order across the studio was Emberdelve → Pyregrove → Fliptide; this
+is the Fliptide leg.
+
+**Standing decisions for this pass.**
+- 2026-10-03 14:03 UTC (owner): finish the coding and produce the build.
+- 2026-10-03 14:33 UTC (owner): "no need for playstore now just work on the
+  games" → **Play hold**: no Play Console / Play API / store-listing / AdMob /
+  CrazyGames action in this pass. GitHub release only, done separately from
+  the game work.
+- One feature per branch per PR; merge gate = local Flutter 3.44.9
+  `flutter analyze` clean + full `flutter test` green on the PR head (private
+  Actions are billing-blocked), summarised in the PR body.
+- Render/feel changes only unless a bug demands otherwise: `lib/sim/`, course
+  codes, Daily seeds, campaign specs, ads gating and the Supporter IAP stay
+  as they are. No new dependencies, no `android/` changes.
+- `progress.md` rotated at 87,538 bytes into `archive/progress-segment-1.md`.
+
+**Version plan.** Unreleased `feat/tidelight-0.4.1` (built once on the mirror
+as 0.4.1+8, never shipped) is folded in without its version bump. The pass
+ships as **0.5.0+9** (9 > 8, the mirror build, and > 7, the highest code on
+any Play track). Packaging is the last PR; tag, signed build and GitHub
+release follow outside the game work.
+
+**Baseline (VERIFIED 2026-10-03 15:4x UTC, main 2560ffb, Flutter 3.44.9).**
+`flutter analyze`: No issues found. `flutter test`: 197 passed / 3 skipped
+(the pre-existing skips).
+
+**Ranked backlog (player-visible value × risk).**
+1. Tidelight scenery — sky/moon above, sea below, glowing spark (unmerged
+   branch, render-only). → `F-OCT-TIDELIGHT-20261003`.
+2. Spark character reacts to danger — eyes track the next hazard and widen,
+   mouth opens; drop per-call `Paint` allocation in the creature draw.
+   → `F-OCT-SPARK-GAZE-20261003`.
+3. Near-miss feedback — a small spark burst when skimming past a spike
+   (render-only, no new audio).
+4. Title backdrop in the Tidelight style so title and run match.
+5. Original creature skins (DEMAND §6 phase 3, ≥ 6) — larger, art-heavy.
+6. Flip SFX snapped to the music beat (DEMAND §6 phase 3) — audio timing
+   risk, needs ears on a device.
+7. Death-clip export (DEMAND §6 phase 3) — large, platform-specific.
+8. Owner listen-through of the music on a phone (open since 0.4.0,
+   owner-side).
+Packaging → `F-OCT-PACKAGE-0.5.0`.
+
+**Status 2026-10-03 16:10 UTC.** Done and merged: 1 (PR #21), 2 (PR #22),
+3 (PR #23, `F-OCT-NEAR-MISS-20261003`), packaging 0.5.0+9 (this PR). Main
+gate: analyzer clean, 216 passed / 3 skipped. Left for the next run, in
+order: 4 title backdrop in the Tidelight style; a golden/render test that
+pins the run-screen look (the three `screens_test.dart` goldens are still
+skipped); 5 original creature skins; 6 beat-snapped flip SFX; 7 death-clip
+export; 8 owner listen-through. Not done here: tag, signed build, GitHub
+release (release step), anything on Play (on hold since 14:33 UTC).
+
 ## Active tester-onboarding pass — 2026-09-09
 
 Canonical `subagent-toolkit` main was cloned and HARNESS.md read in full;
