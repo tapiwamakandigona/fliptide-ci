@@ -11,6 +11,7 @@ class Column {
     this.ceilH = 0,
     this.floorSpike = false,
     this.ceilSpike = false,
+    this.pad = false,
   });
 
   /// Blocks stacked on the floor (0..2) or [kPit].
@@ -20,6 +21,10 @@ class Column {
   final int ceilH;
   final bool floorSpike;
   final bool ceilSpike;
+
+  /// A gravity pad on the floor: passing over it while grounded auto-flips the
+  /// player (no tap needed), the way a pad/orb launches you in the genre.
+  final bool pad;
 
   bool get isPit => floorH == kPit;
 
@@ -46,7 +51,8 @@ class Chunk {
   ///
   /// Glyphs: `#` block, `^` spike standing on the floor surface (or on floor
   /// blocks), `v` spike hanging from the ceiling surface, `_` pit (only
-  /// meaningful in the bottom row), `.` empty.
+  /// meaningful in the bottom row), `o` gravity pad (auto-flip when grounded
+  /// over it), `.` empty.
   factory Chunk.parse(String name, int tier, List<String> rows) {
     final h = rows.length;
     final w = rows.first.length;
@@ -61,6 +67,12 @@ class Chunk {
       var ceilH = 0;
       var floorSpike = false;
       var ceilSpike = false;
+      var pad = false;
+      // A pad sits flat on the floor surface; mark the column wherever `o`
+      // appears (it adds no blocks or spikes).
+      for (var r = 0; r < h; r++) {
+        if (rows[r][x] == 'o') pad = true;
+      }
       // rows[h-1] is y in [0,1) — the bottom row.
       if (rows[h - 1][x] == '_') {
         floorH = kPit;
@@ -88,6 +100,7 @@ class Chunk {
         ceilH: ceilH,
         floorSpike: floorSpike,
         ceilSpike: ceilSpike,
+        pad: pad,
       ));
     }
     return Chunk(name, tier, cols);

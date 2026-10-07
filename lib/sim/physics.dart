@@ -132,6 +132,19 @@ class Sim {
 
     if (tap) s.buffer = c.inputBufferFrames;
 
+    // Gravity pad: standing on one auto-triggers a flip, down the same code
+    // path as a tap (so a replay/ghost/solver reproduces it bit-for-bit).
+    if (s.grounded) {
+      final p0 = (s.x + c.hitInset).floor();
+      final p1 = (s.x + c.playerW - c.hitInset).floor();
+      for (var cx = p0; cx <= p1; cx++) {
+        if (course.at(cx).pad) {
+          s.buffer = c.inputBufferFrames;
+          break;
+        }
+      }
+    }
+
     // 1. Flip (grounded only). Consumes the buffer.
     if (s.grounded && s.buffer > 0) {
       s.side = s.side == Side.floor ? Side.ceiling : Side.floor;
