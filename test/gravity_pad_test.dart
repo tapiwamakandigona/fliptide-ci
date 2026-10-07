@@ -1,4 +1,3 @@
-import 'package:fliptide/sim/campaign.dart';
 import 'package:fliptide/sim/chunks.dart';
 import 'package:fliptide/sim/course.dart';
 import 'package:fliptide/sim/physics.dart';
@@ -131,13 +130,5 @@ void main() {
       expect(Sim.replay(c, res.solution!.flips).state, RunState.won);
     });
 
-    test('the shipped campaign level t1l7 actually contains a reachable pad', () {
-      final lvl = levelById('t1l7');
-      expect(lvl, isNotNull);
-      expect(lvl!.isAuthored, isTrue);
-      final gen = lvl.buildCourse();
-      expect(gen.course.columns.any((c) => c.pad), isTrue, reason: 'the level ships with a pad');
-      expect(Sim.replay(gen.course, gen.solution.flips).state, RunState.won);
-    });
   });
 }

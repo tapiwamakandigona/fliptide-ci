@@ -28,14 +28,6 @@ Chunk _step(int count) =>
 Chunk _hang(int count) =>
     Chunk('overhang_$count', 1, List.filled(count, const Column(ceilH: 1)));
 
-/// A gravity pad sitting on flat floor: [lead] clear tiles, the pad, then
-/// [trail] clear tiles so the auto-flip has somewhere to land.
-Chunk _padHop(int lead, int trail) => Chunk(
-  'spring_pad_${lead}_$trail',
-  1,
-  [...List.filled(lead, Column.flat), const Column(pad: true), ...List.filled(trail, Column.flat)],
-);
-
 /// Each course is storyboarded, not a seed with fortunate rerolls.
 /// At these speeds a crossing costs under 3.2 tiles. Eight clear columns
 /// between unlike obstacles leave time to land, read and choose again.
@@ -128,20 +120,6 @@ final List<List<Chunk>> shallows = [
     _rest(8),
     kFinish,
   ],
-  // Spring Tide: the first gravity pad. Run onto it and it flips you up for
-  // free; ride the ceiling over the fields below. Teaches pads safely.
-  [
-    kStart,
-    _rest(3),
-    _padHop(2, 3),
-    _rest(10),
-    _floor(5),
-    _rest(10),
-    _floor(5),
-    _rest(10),
-    _rest(6),
-    kFinish,
-  ],
 ];
 
 const shallowsHints = [
@@ -151,7 +129,6 @@ const shallowsHints = [
   'Read the next side. One calm tap is enough.',
   'Stay above a long hazard. There is no need to keep tapping.',
   'Walls, water, teeth. Find the safe side and trust the rhythm.',
-  'Run onto the glowing pad — it flips you up for free. Ride the ceiling.',
 ];
 
 const shallowsStory = [
@@ -161,5 +138,4 @@ const shallowsStory = [
   'The beacon answers in pulses. Learn its rhythm.',
   'Light moves over still water. Give yourself room to breathe.',
   'Behind you, the first beacon wakes. Ahead: the Drift.',
-  'A spring tide lifts you without a step. Let it carry you up.',
 ];

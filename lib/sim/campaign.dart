@@ -90,7 +90,7 @@ final List<Tide> kTides = [
     tagline: 'Learn the flip.',
     levels: _tide(
       1,
-      ['First Light', 'Low Water', 'Sandbar', 'Ripples', 'Rock Pool', 'Ebb', 'Spring Tide'],
+      ['First Light', 'Low Water', 'Sandbar', 'Ripples', 'Rock Pool', 'Ebb'],
       [
         _spec(1001, columns: 60, speed: 6.5, maxTier: 1, weights: _w1),
         _spec(1002, columns: 70, speed: 6.5, maxTier: 1, weights: _w1),
@@ -98,7 +98,6 @@ final List<Tide> kTides = [
         _spec(1004, columns: 90, speed: 7.0, maxTier: 1, weights: _w1),
         _spec(1005, columns: 100, speed: 7.5, maxTier: 1, weights: _w1),
         _spec(1006, columns: 110, speed: 7.5, maxTier: 2, weights: {1: 4, 2: 1}),
-        _spec(1007, columns: 110, speed: 6.5, maxTier: 1, weights: _w1),
       ],
     ),
   ),
