@@ -157,6 +157,8 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
   final Paint _overlayPaint = Paint()..color = const Color(0x66000000);
   final Paint _edgePaint = Paint()..color = Palette.slabEdge;
   final Paint _wallPaint = Paint()..color = Palette.slabEdge.withValues(alpha: 0.55);
+  final Paint _padPaint = Paint()..color = Palette.finish;
+  final Paint _padGlow = Paint()..color = Palette.finish.withValues(alpha: 0.18);
   final Paint _particlePaint = Paint();
   // Creature paints, recoloured per draw instead of allocated per draw.
   final Paint _cShadow = Paint();
@@ -676,6 +678,14 @@ class FlipGame extends FlameGame with TapCallbacks, KeyboardEvents {
       }
       if (col.ceilSpike) {
         _drawSpike(canvas, x0, t, sy((h - col.ceilH).toDouble()), 1);
+      }
+      // Gravity pad: a bright launch strip on the floor rim with a soft glow.
+      if (col.pad && !col.isPit) {
+        final top = sy(col.floorH.toDouble());
+        final padH = math.max(2.0, t * 0.16);
+        final bar = Rect.fromLTWH(x0 + t * 0.14, top - padH, t * 0.72, padH);
+        canvas.drawRRect(RRect.fromRectAndRadius(bar.inflate(padH * 0.6), Radius.circular(padH)), _padGlow);
+        canvas.drawRRect(RRect.fromRectAndRadius(bar, Radius.circular(padH * 0.5)), _padPaint);
       }
     }
 

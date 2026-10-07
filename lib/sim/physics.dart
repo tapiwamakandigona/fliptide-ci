@@ -132,13 +132,16 @@ class Sim {
 
     if (tap) s.buffer = c.inputBufferFrames;
 
-    // Gravity pad: standing on one auto-triggers a flip, down the same code
-    // path as a tap (so a replay/ghost/solver reproduces it bit-for-bit).
-    if (s.grounded) {
+    // Gravity pad (floor): while grounded ON THE FLOOR over a pad, auto-trigger
+    // a flip, down the same buffered path as a tap, so replays/ghosts/the solver
+    // reproduce it bit-for-bit. A pad only acts on its own surface (a floor pad
+    // does nothing while the player runs the ceiling) and never over a pit.
+    if (s.grounded && s.side == Side.floor) {
       final p0 = (s.x + c.hitInset).floor();
       final p1 = (s.x + c.playerW - c.hitInset).floor();
       for (var cx = p0; cx <= p1; cx++) {
-        if (course.at(cx).pad) {
+        final col = course.at(cx);
+        if (col.pad && !col.isPit) {
           s.buffer = c.inputBufferFrames;
           break;
         }
