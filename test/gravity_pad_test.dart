@@ -104,6 +104,21 @@ void main() {
     });
   });
 
+  group('gravity pad — surface contact', () {
+    test('a lower pad the runner only overlaps from a higher floor does not fire', () {
+      final cols = List<Column>.generate(40, (i) {
+        if (i == 20) return const Column(floorH: 0, pad: true);
+        if (i < 20) return const Column(floorH: 1);
+        return const Column();
+      });
+      final sim = Sim(Course(seed: 0, chunks: [Chunk('ledge', 1, cols)], speed: 9));
+      sim.s = SimState(x: 19.5, y: 1, vy: 0, side: Side.floor, grounded: true, frame: 0, state: RunState.running, cause: DeathCause.none, buffer: 0);
+      sim.step();
+      expect(sim.flips, isEmpty, reason: 'feet are on column 19 (floorTop 1), not on the pad at floorTop 0');
+      expect(sim.s.side, Side.floor);
+    });
+  });
+
   group('gravity pad — integration', () {
     test('a pad lifts the player over a floor spike that kills the control run', () {
       final withPad = _runIdle(_flatWith('...o........^...'));
@@ -117,10 +132,36 @@ void main() {
       final c = _flatWith('......o.....');
       final live = _runIdle(c);
       final rep = Sim.replay(c, live.flips);
-      expect(rep.state, live.end.state);
-      expect(rep.frame, live.end.frame);
-      expect(rep.x, live.end.x);
-      expect(rep.side, live.end.side);
+      _expectSameState(rep, live.end);
+    });
+
+    test('a tap on the same frame as a pad yields one flip, identical to the pad alone', () {
+      final c = _flatWith('......o.....');
+      final padOnly = _runIdle(c);
+      final first = padOnly.flips.first;
+      final sim = Sim(c);
+      while (sim.s.state == RunState.running && sim.s.frame < sim.totalFrames) {
+        sim.step(tap: sim.s.frame == first);
+      }
+      expect(sim.flips, padOnly.flips);
+      _expectSameState(sim.s, padOnly.end);
+      _expectSameState(Sim.replay(c, sim.flips), sim.s);
+    });
+
+    test('a tap buffered mid-air before landing on a pad produces a deterministic replayable run', () {
+      final c = _flatWith('......o.....');
+      final sim = Sim(c);
+      var tapped = false;
+      while (sim.s.state == RunState.running && sim.s.frame < sim.totalFrames) {
+        final tap = !tapped && sim.flips.isNotEmpty && !sim.s.grounded;
+        if (tap) tapped = true;
+        sim.step(tap: tap);
+      }
+      expect(tapped, isTrue);
+      _expectSameState(Sim.replay(c, sim.flips), sim.s);
+      for (var i = 1; i < sim.flips.length; i++) {
+        expect(sim.flips[i], greaterThan(sim.flips[i - 1]), reason: 'never two flips in one frame');
+      }
     });
 
     test('the solver finds and the replay wins a pad course', () {
@@ -131,4 +172,16 @@ void main() {
     });
 
   });
+}
+
+void _expectSameState(SimState a, SimState b) {
+  expect(a.x, b.x);
+  expect(a.y, b.y);
+  expect(a.vy, b.vy);
+  expect(a.side, b.side);
+  expect(a.grounded, b.grounded);
+  expect(a.frame, b.frame);
+  expect(a.state, b.state);
+  expect(a.cause, b.cause);
+  expect(a.buffer, b.buffer);
 }
