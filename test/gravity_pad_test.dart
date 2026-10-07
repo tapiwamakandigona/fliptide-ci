@@ -148,7 +148,7 @@ void main() {
       _expectSameState(Sim.replay(c, sim.flips), sim.s);
     });
 
-    test('a tap buffered mid-air before landing on a pad produces a deterministic replayable run', () {
+    test('a tap made mid-air just after a pad launch produces a deterministic replayable run', () {
       final c = _flatWith('......o.....');
       final sim = Sim(c);
       var tapped = false;
@@ -162,6 +162,73 @@ void main() {
       for (var i = 1; i < sim.flips.length; i++) {
         expect(sim.flips[i], greaterThan(sim.flips[i - 1]), reason: 'never two flips in one frame');
       }
+    });
+
+    test('a tap buffered just before landing on a floor pad merges with the pad into one flip', () {
+      // Run the ceiling over a long pad strip, drop to the floor, and tap again
+      // a few frames before touching down. The buffered tap and the pad must
+      // resolve as ONE flip on the landing step (no double flip), identical to
+      // the pad alone. A no-pad control proves the late tap really is buffered.
+      final strip = 'o' * 40;
+      final padCourse = _flatWith(strip);
+      final plainCourse = _flatWith('.' * strip.length);
+      var px = -1;
+      for (var cx = 0; cx < padCourse.length.ceil(); cx++) {
+        if (padCourse.at(cx).pad) {
+          px = cx;
+          break;
+        }
+      }
+      expect(px, greaterThan(0));
+
+      // Probe on the pad course: tap at frame 0 (to the ceiling), then tap once
+      // grounded on the ceiling over the strip, and record the landing frame.
+      var dropFrame = -1;
+      var landFrame = -1;
+      final probe = Sim(padCourse);
+      while (probe.s.state == RunState.running && probe.s.frame < probe.totalFrames) {
+        final f = probe.s.frame;
+        var tap = f == 0;
+        if (dropFrame < 0 && f > 0 && probe.s.grounded && probe.s.side == Side.ceiling && probe.s.x >= px + 1) {
+          dropFrame = f;
+          tap = true;
+        }
+        probe.step(tap: tap);
+        if (dropFrame >= 0 && landFrame < 0 && probe.s.grounded && probe.s.side == Side.floor) {
+          landFrame = f;
+          break;
+        }
+      }
+      expect(dropFrame, greaterThan(0));
+      expect(landFrame, greaterThan(dropFrame + 4));
+      const lead = 3;
+      expect(lead, lessThan(const SimConfig().inputBufferFrames));
+      final lateTap = landFrame - lead;
+
+      ({SimState end, List<int> flips, bool airborneAtLateTap}) run(Course c, Set<int> taps) {
+        final sim = Sim(c);
+        var airborne = false;
+        while (sim.s.state == RunState.running && sim.s.frame < sim.totalFrames) {
+          if (sim.s.frame == lateTap) airborne = !sim.s.grounded;
+          sim.step(tap: taps.contains(sim.s.frame));
+        }
+        return (end: sim.s, flips: List<int>.from(sim.flips), airborneAtLateTap: airborne);
+      }
+
+      final padAlone = run(padCourse, {0, dropFrame});
+      final padPlusTap = run(padCourse, {0, dropFrame, lateTap});
+      expect(padPlusTap.airborneAtLateTap, isTrue, reason: 'the late tap must happen in the air');
+      expect(padAlone.flips.length, greaterThanOrEqualTo(3), reason: 'the pad fires on landing');
+      expect(padPlusTap.flips, padAlone.flips, reason: 'buffered tap + pad = one flip, not two');
+      _expectSameState(padPlusTap.end, padAlone.end);
+      _expectSameState(Sim.replay(padCourse, padPlusTap.flips), padPlusTap.end);
+
+      final plainNoTap = run(plainCourse, {0, dropFrame});
+      final plainTap = run(plainCourse, {0, dropFrame, lateTap});
+      expect(plainTap.airborneAtLateTap, isTrue);
+      expect(plainNoTap.flips.length, 2, reason: 'control: no pad, no landing flip');
+      expect(plainTap.flips.length, 3, reason: 'control: the late tap is buffered and fires on landing');
+      expect(plainTap.flips[2], padAlone.flips[2], reason: 'buffered tap and pad fire on the same landing step');
     });
 
     test('the solver finds and the replay wins a pad course', () {
